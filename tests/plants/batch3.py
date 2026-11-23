@@ -30,8 +30,8 @@ PLANTS = [
      "    (when (> g drift)\n      (when (== low start)",
      "    (when (> g eg)\n      (when (== low start)"),
     (SOURCE, "an interval taken to be convex wherever the gain is above zero",
-     "    (when (and (inline (math:finite? gain)) (> gain loss))",
-     "    (when (and (inline (math:finite? gain)) (> gain 0.0d0))"),
+     "    (when (and (finite? gain) (> gain loss))",
+     "    (when (and (finite? gain) (> gain 0.0d0))"),
     (SOURCE, "a second candidate judged by the distance at its parameter, not at its least point",
      "                      (least-floor (arr:aref num n-d) (arr:aref num n-ed) (arr:aref num n-g) (arr:aref num n-eg)\n"
      "                                   curvature)",
