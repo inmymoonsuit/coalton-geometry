@@ -27,6 +27,10 @@ corrects this page if the section turns out to hold something else.
 | G. Farin, *NURBS: From Projective Geometry to Practical Use* | Second edition, A K Peters, 1999 | Rational curves: conics as rational quadratics and what their weights say, rational Bézier curves and their derivatives, rational B-splines | States its methods as mathematics, with no listing in any language. Its surfaces are beyond the plan |
 | G. Glaeser, H. Stachel and B. Odehnal, *The Universe of Conics: From the Ancient Greeks to 21st Century Developments* | Second edition, Springer, 2024 | The conics, with proofs: definitions, curvature and evolutes, and the normals from a point to a conic, which are its nearest and farthest points | Geometry and not numerical analysis: it says what the answer is, not how a computed one errs |
 | J. Solà, J. Deray and D. Atchuthan, *A micro Lie theory for state estimation in robotics* | arXiv 1812.01537, version 9, 8 December 2021 | Rotations of the plane and of space: the exponential and the logarithm, composition, and the left and right Jacobians in closed form | **Its authors publish a C++ library beside it, which is not read.** The closed forms are given as they are; their behaviour at a small angle is derived here |
+| N. Chernov and S. Wijewickrema, *Algorithms for projecting points onto conics* | Journal of Computational and Applied Mathematics 251 (2013), pp. 8-21 | Computing the nearest point of a conic in floating point: which methods lose accuracy and why, and two that are proven to converge | Reports accuracy by tests, not by a bound. **Code was published beside it, and it describes a method whose own description is published beside code; neither code is read.** The paper itself has no listing |
+| P. Luo, *A Certified Interval Method for the Distance from a Point to an Ellipse* | Preprint, Research Square, DOI 10.21203/rs.3.rs-10613486/v1, 19 August 2026; CC BY 4.0 | The nearest point of an ellipse as an enclosure: the count of feet by the evolute, two parameterizations that between them condition every simple foot well, and inputs that break other methods | **Not reviewed.** A theorem taken from it is proved again here or checked against the conics text. Its two algorithm boxes may be read for the method and are not followed statement by statement; its MATLAB source is not read |
+| J. Todesco and O. Brüls, *Highly accurate differentiation of the exponential map and its tangent operator* | Mechanism and Machine Theory 190 (2023), 105451; the authors' postprint of 7 October 2023 | Round-off in the closed forms of the rotation Jacobians at a small angle, truncation of their series at a large one, and where to switch | Its thresholds are for its own tolerances. A MATLAB annex is published with it and is not read |
+| Z. Nurlanov, *Exploring SO(3) logarithmic map: degeneracies and derivatives* | Report, Technical University of Munich, 2021 | The logarithm of a rotation at and near a half turn | Not reviewed; a second reading. It speaks of two libraries, which are not read |
 | N. J. Higham, *Accuracy and Stability of Numerical Algorithms* | Second edition, SIAM, 2002 | The model of floating-point arithmetic and the notation every error bound here is stated in; Newton's method in floating point | |
 | A. P. Kiselev, *Geometry, Book II: Stereometry*, adapted by A. Givental | Sumizdat, 2008 | Definitions only: an angle between planes, a perpendicular to a plane, a cylinder, a cone | A school text by synthetic argument; no method is taken from it |
 
@@ -89,7 +93,10 @@ centres of curvature, 4.1; osculating circles, 4.4. Farin and Hansford, 19.3, fo
 brought to standard position. Glaeser, Stachel and Odehnal: the classical definitions,
 2.1; curvature and evolutes of conics, 3.2; and the feet of the normals from a point to an
 ellipse, with how many there are and where, 9.3, which is what the nearest and the farthest
-point are held to. Farin's *NURBS*, 5.6, for the parabola as a rational quadratic.
+point are held to. Farin's *NURBS*, 5.6, for the parabola as a rational quadratic. Chernov and Wijewickrema,
+sections 2, 3, 6 and 7, for how a foot is computed and what breaks each way of doing it;
+Luo, sections 2 and 3, for the count of feet and the two parameterizations, and section 5
+for inputs to test on.
 
 ### Batch 6, `rotation`
 
@@ -99,7 +106,9 @@ function. Vannucci, 2.9 and 2.11: skew tensors and their axial vectors, rotation
 and amplitude, their composition, and the small-rotation limit. Solà, Deray and Atchuthan: the exponential
 and the logarithm of rotations of space as unit quaternions and as matrices, appendix B-A; the
 right and left Jacobians, II-G, and their closed forms for rotations of space, appendix B-C;
-appendix A for rotations of the plane.
+appendix A for rotations of the plane. Todesco and Brüls, 4.1 for the closed forms and 5
+for their round-off at a small angle and the series' truncation at a large one; Nurlanov
+for the logarithm near a half turn.
 
 ### Batch 7, `measure`
 
@@ -125,11 +134,13 @@ since 2026-11-23, and what each text leaves to this library is said with it.
   function theorem, is specified there and not yet built.
 - ~~**The nearest and farthest points of an ellipse**, for batch 4.~~ Glaeser, Stachel and
   Odehnal, 9.3: the feet of the normals from a point, two, three or four of them by where
-  the point lies against the evolute. That is the geometry an answer must agree with. **How
-  to compute a foot and bound its error is still this library's to derive**: the
-  description best known is published beside code that implements it, which the rule
-  excludes, and no analysis of the root-finding in floating point is held.
+  the point lies against the evolute. That is the geometry an answer must agree with. How a
+  foot is computed in floating point, and what breaks each way of doing it, is in Chernov
+  and Wijewickrema and in Luo's preprint. **A bound for a computed foot is still this
+  library's to derive**: the first reports accuracy by tests, and the second is not
+  reviewed.
 - ~~**The derivative of the exponential map of rotations**, for batch 6.~~ Solà, Deray and
   Atchuthan give the left and right Jacobians and their inverses in closed form, derived.
-  **Their forms for a small angle and near a half turn are still this library's to
-  derive**, with the bound each is tested against.
+  Todesco and Brüls analyse the round-off of those forms at a small angle and the
+  truncation of the series that replaces them. **Where this library switches, and the
+  bound each form is tested against, are still its own to derive.**
