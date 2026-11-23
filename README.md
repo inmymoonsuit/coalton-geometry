@@ -1,13 +1,21 @@
 # coalton-geometry
 
-Geometry in [Coalton](https://github.com/coalton-lang/coalton), as a library of its own.
+An independent geometry library written in
+[Coalton](https://github.com/coalton-lang/coalton), for 64-bit SBCL, in double precision.
+It offers B-spline basis functions and their derivatives to any order; the curves that are
+their combinations, in any dimension, with their derivatives; and the parameter of a curve
+nearest to a point, shown to be the nearest of the whole curve and reported as a tie where
+the curve offers two. Each answer comes with an error bound derived before the code was
+written, and every answer is tested against that bound in exact arithmetic.
 
-**Status: three modules built.** B-spline basis functions; the curves that are their
-combinations, with their derivatives; and the parameter of a curve nearest to a point, of
-the whole curve and with a report where the curve offers two. Each has bounds that every
-answer is tested against in exact arithmetic.
-[The batch plan](docs/plan.md) has what follows and [the roadmap](ROADMAP.md) what each
-waits for.
+The library takes knots, control points and points in arrays the caller owns, and writes
+values, parameters and reports into arrays the caller owns. Tolerances, units and
+conventions belong to the caller: nothing here chooses one. No application code is loaded
+or required.
+
+**Status: three modules built**, all of them on splines. Conics, rotations and measures
+come next: [the batch plan](docs/plan.md) has what follows and [the roadmap](ROADMAP.md)
+what each waits for.
 
 | Package | What it gives | Contract |
 | --- | --- | --- |
