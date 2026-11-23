@@ -45,7 +45,7 @@
                           * arr:LispArray F64 * arr:LispArray UFix * UFix -> Void))
   (define (evaluate-loop handle controls dimension parameters order rows out tally count)
     "count rounds of the curve's evaluate! at each parameter in turn. The calls that do not succeed are counted into tally[0]."
-    (for ((round 0 (+ round 1))) :while (< round count)
+    (for () :repeat count
       (for ((i 0 (+ i 1))) :while (< i (arr:length parameters))
         (unless (== (curve:evaluate! handle controls dimension (arr:aref parameters i) order rows out) basis:BasisSuccess)
           (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))
@@ -54,6 +54,6 @@
                        * arr:LispArray F64 * arr:LispArray F64 * arr:LispArray UFix * UFix -> Void))
   (define (batch-loop handle controls dimension parameters order spans rows out tally count)
     "count calls of the curve's evaluate-batch!. The calls that do not succeed are counted into tally[0]."
-    (for ((round 0 (+ round 1))) :while (< round count)
+    (for () :repeat count
       (unless (== (curve:evaluate-batch! handle controls dimension parameters order spans rows out) basis:BasisSuccess)
         (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))

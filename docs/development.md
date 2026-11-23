@@ -102,3 +102,8 @@ type declaration on every exported function; `for` in place of recursion for a l
 `lisp` forms avoided, and factored into a function of their own where one is needed; one
 package a file, with local nicknames. On the Lisp side: `loop` keywords written as
 keywords, no `#'(lambda`, `case` keys in parentheses.
+
+Use `math:infinity` and `math:nan` directly. Write a chain of predicates as one
+`and` or `or`, in short-circuit order. Prefer local bindings for intermediates;
+when several calls do share an indexed workspace, derive the slot indices and the
+array size from the same declaration.

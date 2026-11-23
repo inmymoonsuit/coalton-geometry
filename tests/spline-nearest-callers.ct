@@ -52,6 +52,6 @@
                          -> Void))
   (define (nearest-loop search controls points hints step tie feet reports measures tally count)
     "count calls of nearest!. The calls that do not succeed are counted into tally[0]."
-    (for ((round 0 (+ round 1))) :while (< round count)
+    (for () :repeat count
       (unless (== (nearest:nearest! search controls points hints step tie feet reports measures) nearest:SearchSuccess)
         (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))

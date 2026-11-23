@@ -29,7 +29,7 @@
       ((/= bits 0) (values (with-exponent x 1022) (- bits 1022)))
       ((== x 0.0d0) (values x 0))
       (True
-       (let normal = (* x 18014398509481984.0d0)) ; 2^54
+       (let normal = (* x #.(cl:scale-float 1d0 54)))
        (values (with-exponent normal 1022) (- (exponent-bits normal) 1076)))))
 
   (inline)
@@ -44,8 +44,7 @@
       ((> bits 0) (with-exponent fraction bits))
       ((< bits -52) (* fraction 0.0d0))
       ;; Only this last multiplication rounds a subnormal result.
-      (True (* (with-exponent fraction (+ bits 1022))
-               (lisp (-> F64) () cl:least-positive-normalized-double-float)))))
+      (True (* (with-exponent fraction (+ bits 1022)) #.cl:least-positive-normalized-double-float))))
 
   (inline)
   (declare add-binary (F64 * IFix * F64 * IFix -> F64 * IFix))

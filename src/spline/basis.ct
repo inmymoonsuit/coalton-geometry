@@ -1,7 +1,7 @@
 (cl:defpackage #:coalton-geometry/spline/basis
   (:use #:coalton #:coalton-prelude)
   (:import-from #:coalton-geometry/internal/scaled #:split-binary #:scale-binary #:add-binary)
-  (:local-nicknames (#:arr #:coalton/lisparray) (#:math #:coalton/math))
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:math #:coalton/math) (#:cell #:coalton/cell))
   (:export #:Basis #:make-basis
            #:BasisError #:DegreeBelowOne #:TooFewKnots #:KnotNotFinite #:KnotsDecrease
            #:KnotRepeatedTooOften #:EmptyDomain #:KnotSpanTooLarge #:OutputAliased
@@ -64,8 +64,8 @@
     (stage (arr:LispArray F64))
     (ratio (arr:LispArray F64))
     (exponents (arr:LispArray IFix))
-    (held (arr:LispArray F64))
-    (state (arr:LispArray UFix)))
+    (last-span (cell:Cell UFix))
+    (refused (cell:Cell UFix)))
 
   (repr :transparent)
   (define-type Basis
@@ -74,19 +74,7 @@
 
   (inline)
   (declare storage (Basis -> BasisStorage))
-  (define (storage basis) (match basis ((MkBasis kept) kept)))
-
-  (inline)
-  (declare count->float (UFix -> F64))
-  (define (count->float count)
-    "A count as a floating-point number; exact below 2^53."
-    (lisp (-> F64) (count) (cl:coerce count 'cl:double-float)))
-
-  (inline)
-  (declare halfway (UFix * UFix -> UFix))
-  (define (halfway low high)
-    "The index midway between two, rounded down."
-    (lisp (-> UFix) (low high) (cl:ash (cl:+ low high) -1)))
+  (define (storage (MkBasis kept)) kept)
 
   (inline)
   (declare holds-exactly? (UFix * UFix * UFix * UFix -> Boolean))
@@ -117,36 +105,22 @@
       (throw (EmptyDomain degree controls)))
     (unless (inline (math:finite? (- (arr:aref knots (- count 1)) (arr:aref knots 0))))
       (throw (KnotSpanTooLarge (- count 1))))
-    (let copy = (arr:make count 0.0d0))
-    (for ((i 0 (+ i 1))) :while (< i count)
-      (arr:set! copy i (arr:aref knots i)))
-    (let state = (arr:make 4 (the UFix 0)))
-    ;; The last span: the highest knot of the domain that is below its end.
-    (for ((i degree (+ i 1))) :while (< i controls)
-      (when (< (arr:aref copy i) (arr:aref copy controls))
-        (arr:set! state 0 i)))
-    ;; The longest run of equal knots strictly inside the domain: slot 3 counts the run that
-    ;; ends at i, and slot 1 keeps the longest.
-    (for ((i 0 (+ i 1))) :while (< i count)
-      (cond
-        ((and (> i 0) (== (arr:aref copy i) (arr:aref copy (- i 1))))
-         (arr:set! state 3 (+ (arr:aref state 3) 1)))
-        (True (arr:set! state 3 1)))
-      (when (and (> (arr:aref copy i) (arr:aref copy degree))
-                 (and (< (arr:aref copy i) (arr:aref copy controls))
-                      (> (arr:aref state 3) (arr:aref state 1))))
-        (arr:set! state 1 (arr:aref state 3))))
-    (let final = (arr:aref state 0))
-    (let crowd = (arr:aref state 1))
-    (for ((i 0 (+ i 1))) :while (< i 4)
-      (arr:set! state i 0))
-    (MkBasis (BasisStorage degree order final crowd copy
+    (let start = (arr:aref knots degree))
+    (let end = (arr:aref knots controls))
+    (let final = (for ((i (- controls 1) (- i 1))) :returns i :while (== (arr:aref knots i) end)))
+    (let crowd = (cell:new 0))
+    (let run = (cell:new 0))
+    (for ((i (+ degree 1) (+ i 1))) :while (< i controls)
+      (let knot = (arr:aref knots i))
+      (cell:write! run (if (== knot (arr:aref knots (- i 1))) (+ (cell:read run) 1) 1))
+      (when (and (> knot start) (< knot end))
+        (cell:write! crowd (max (cell:read crowd) (cell:read run)))))
+    (MkBasis (BasisStorage degree order final (cell:read crowd) (arr:copy knots)
                            (arr:make (* width width) 0.0d0)
                            (arr:make (* (+ (min order degree) 1) width) 0.0d0)
                            (arr:make width 0.0d0)
                            (arr:make width (the IFix 0))
-                           (arr:make 1 0.0d0)
-                           state)))
+                           (cell:new 0) (cell:new 0))))
 
   (declare degree (Basis -> UFix))
   (define (degree basis)
@@ -186,47 +160,41 @@
   (declare latest-span (Basis -> UFix))
   (define (latest-span basis)
     "The span of the latest evaluate! that returned BasisSuccess: the functions it wrote are those numbered from the span less the degree to the span. 0 before any."
-    (arr:aref (.state (storage basis)) 0))
+    (cell:read (.last-span (storage basis))))
 
   (declare refused-index (Basis -> UFix))
   (define (refused-index basis)
     "After an evaluate-batch! that a parameter caused to refuse, the position of the first such parameter. After any other evaluate-batch!, the number of parameters it was given."
-    (arr:aref (.state (storage basis)) 1))
+    (cell:read (.refused (storage basis))))
 
-  (declare locate! (BasisStorage -> UFix))
-  (define (locate! store)
-    "The span of the held parameter, which is finite and in the domain: the knot interval, closed on the left, that holds it, and the last one for the end of the domain."
+  (declare locate (BasisStorage * F64 -> UFix))
+  (define (locate store u)
+    "The span of a finite parameter in the domain, using the last span at the right endpoint."
     (let knot = (.knot store))
-    (let state = (.state store))
-    (let u = (arr:aref (.held store) 0))
     (let controls = (- (arr:length knot) (+ (.p store) 1)))
     (when (>= u (arr:aref knot controls))
       (return (.final store)))
-    ;; Between slots 2 and 3 there is always a knot at or below the parameter and one above it.
-    (arr:set! state 2 (.p store))
-    (arr:set! state 3 controls)
-    (for () :while (> (- (arr:aref state 3) (arr:aref state 2)) 1)
-      (let middle = (halfway (arr:aref state 2) (arr:aref state 3)))
+    (let low = (cell:new (.p store)))
+    (let high = (cell:new controls))
+    (for () :while (> (- (cell:read high) (cell:read low)) 1)
+      (let middle = (+ (cell:read low) (math:div (- (cell:read high) (cell:read low)) 2)))
       (cond
-        ((<= (arr:aref knot middle) u) (arr:set! state 2 middle))
-        (True (arr:set! state 3 middle))))
-    (arr:aref state 2))
+        ((<= (arr:aref knot middle) u) (cell:write! low middle))
+        (True (cell:write! high middle))))
+    (cell:read low))
 
   (declare multiplicity (BasisStorage * UFix -> UFix))
   (define (multiplicity store span)
     "How many knots equal the one that opens this span."
     (let knot = (.knot store))
-    (let state = (.state store))
-    (arr:set! state 2 1)
-    (for ((i span (- i 1))) :while (and (> i 0) (== (arr:aref knot (- i 1)) (arr:aref knot span)))
-      (arr:set! state 2 (+ (arr:aref state 2) 1)))
-    (arr:aref state 2))
+    (for ((i span (- i 1)))
+      :returns (+ (- span i) 1)
+      :while (and (> i 0) (== (arr:aref knot (- i 1)) (arr:aref knot span)))))
 
-  (declare admit (BasisStorage * UFix -> BasisStatus))
-  (define (admit store order)
-    "Whether the held parameter can be evaluated to this order: BasisSuccess, or the refusal it gets. Writes nothing a caller can read."
+  (declare admit (BasisStorage * F64 * UFix -> BasisStatus))
+  (define (admit store u order)
+    "Whether the parameter can be evaluated to this order."
     (let knot = (.knot store))
-    (let u = (arr:aref (.held store) 0))
     (let p = (.p store))
     (let controls = (- (arr:length knot) (+ p 1)))
     (unless (inline (math:finite? u))
@@ -240,12 +208,12 @@
     ;; At either end of the domain the derivative is the one from inside it.
     (when (or (== u (arr:aref knot p)) (== u (arr:aref knot controls)))
       (return BasisSuccess))
-    (let span = (locate! store))
+    (let span = (locate store u))
     (unless (== u (arr:aref knot span))
       (return BasisSuccess))
-    (cond
-      ((and (<= order p) (<= (multiplicity store span) (- p order))) BasisSuccess)
-      (True BasisDerivativeUndefined)))
+    (if (and (<= order p) (<= (multiplicity store span) (- p order)))
+        BasisSuccess
+        BasisDerivativeUndefined))
 
   (declare retry-derivatives! (BasisStorage * UFix * UFix -> Boolean))
   (define (retry-derivatives! store span rows)
@@ -265,7 +233,7 @@
         (arr:set! exps r 0))
       (for ((d (+ start 1) (+ d 1))) :while (<= d p)
         (let first = (- above d))
-        (let factor = (count->float d))
+        (let factor = (math:integral->num d))
         (for ((i 0 (+ i 1))) :while (< i d)
           (let (values divisor shift) =
             (split-binary (- (arr:aref knot (+ above i)) (arr:aref knot (+ first i)))))
@@ -288,14 +256,13 @@
         (arr:set! stage (+ base r) entry)))
     True)
 
-  (declare fill! (BasisStorage * UFix * UFix -> Boolean))
-  (define (fill! store span rows)
-    "Compute into the stage, for the held parameter on this span, the values and then each derivative up to rows - 1, rows being at most the degree and one. False when a derivative is not a finite number."
+  (declare fill! (BasisStorage * F64 * UFix * UFix -> Boolean))
+  (define (fill! store u span rows)
+    "Compute into the stage the values and derivatives up to rows - 1 on the given span. False when a derivative is not finite."
     (let knot = (.knot store))
     (let table = (.table store))
     (let stage = (.stage store))
     (let ratio = (.ratio store))
-    (let u = (arr:aref (.held store) 0))
     (let p = (.p store))
     (let width = (+ p 1))
     (let above = (+ span 1))
@@ -330,7 +297,7 @@
         (arr:set! stage (+ base r) (arr:aref table (+ (* start width) r))))
       (for ((d (+ start 1) (+ d 1))) :while (<= d p)
         (let first = (- above d))
-        (let scale = (count->float d))
+        (let scale = (math:integral->num d))
         (for ((i 0 (+ i 1))) :while (< i d)
           (arr:set! ratio i (/ (arr:aref stage (+ base i))
                                (- (arr:aref knot (+ above i)) (arr:aref knot (+ first i))))))
@@ -355,9 +322,9 @@
     (for ((i computed (+ i 1))) :while (< i all)
       (arr:set! out (+ offset i) 0.0d0)))
 
-  (declare evaluate-held! (Basis * UFix * arr:LispArray F64 -> BasisStatus))
-  (define (evaluate-held! basis order out)
-    "evaluate! for the parameter already held in the basis."
+  (declare evaluate! (Basis * F64 * UFix * arr:LispArray F64 -> BasisStatus))
+  (define (evaluate! basis parameter order out)
+    "Write into out the values at the parameter of the degree + 1 basis functions that are not zero on its span, then their first derivatives, and so on to the order: (order + 1)(degree + 1) numbers, each row in increasing number of basis function. Read the span with latest-span. On any status but BasisSuccess nothing is written. See docs/spline-basis.md."
     (let store = (storage basis))
     (when (unsafe-pointer-eq? out (.knot store))
       (throw (OutputAliased "The output is the basis's own knots.")))
@@ -365,36 +332,27 @@
       (return BasisBadOrder))
     (unless (holds-exactly? (arr:length out) 1 order (+ (.p store) 1))
       (return BasisBadSize))
-    (let status = (admit store order))
+    (let status = (admit store parameter order))
     (unless (== status BasisSuccess)
       (return status))
-    (let span = (locate! store))
+    (let span = (locate store parameter))
     (let rows = (+ (min order (.p store)) 1))
-    (unless (fill! store span rows)
+    (unless (fill! store parameter span rows)
       (return BasisNonFinite))
     (deliver! store rows order out 0)
-    (arr:set! (.state store) 0 span)
+    (cell:write! (.last-span store) span)
     BasisSuccess)
-
-  (declare evaluate! (Basis * F64 * UFix * arr:LispArray F64 -> BasisStatus))
-  (define (evaluate! basis parameter order out)
-    "Write into out the values at the parameter of the degree + 1 basis functions that are not zero on its span, then their first derivatives, and so on to the order: (order + 1)(degree + 1) numbers, each row in increasing number of basis function. Read the span with latest-span. On any status but BasisSuccess nothing is written. See docs/spline-basis.md."
-    ;; The parameter is put where the workers read it, as a batch puts each of its own.
-    (arr:set! (.held (storage basis)) 0 parameter)
-    (evaluate-held! basis order out))
 
   (declare evaluate-batch! (Basis * arr:LispArray F64 * UFix * arr:LispArray UFix * arr:LispArray F64 -> BasisStatus))
   (define (evaluate-batch! basis parameters order spans out)
     "For each parameter in turn, write its span into spans and its block of (order + 1)(degree + 1) numbers into out, as evaluate! lays one out. Every parameter is checked before anything is written; a refusal a parameter causes leaves its position in refused-index. Only BasisNonFinite for a derivative too large to hold can come after a write. See docs/spline-basis.md."
     (let store = (storage basis))
-    (let state = (.state store))
-    (let held = (.held store))
     (let count = (arr:length parameters))
     (when (unsafe-pointer-eq? out (.knot store))
       (throw (OutputAliased "The output is the basis's own knots.")))
     (when (unsafe-pointer-eq? out parameters)
       (throw (OutputAliased "The output is the array of parameters.")))
-    (arr:set! state 1 count)
+    (cell:write! (.refused store) count)
     (when (> order (.limit store))
       (return BasisBadOrder))
     (let width = (+ (.p store) 1))
@@ -403,18 +361,17 @@
     (when (== count 0)
       (return BasisSuccess))
     (for ((i 0 (+ i 1))) :while (< i count)
-      (arr:set! held 0 (arr:aref parameters i))
-      (let status = (admit store order))
+      (let status = (admit store (arr:aref parameters i) order))
       (unless (== status BasisSuccess)
-        (arr:set! state 1 i)
+        (cell:write! (.refused store) i)
         (return status)))
     (let rows = (+ (min order (.p store)) 1))
     (let block = (* (+ order 1) width))
     (for ((i 0 (+ i 1))) :while (< i count)
-      (arr:set! held 0 (arr:aref parameters i))
-      (let span = (locate! store))
-      (unless (fill! store span rows)
-        (arr:set! state 1 i)
+      (let parameter = (arr:aref parameters i))
+      (let span = (locate store parameter))
+      (unless (fill! store parameter span rows)
+        (cell:write! (.refused store) i)
         (return BasisNonFinite))
       (arr:set! spans i span)
       (deliver! store rows order out (* i block)))

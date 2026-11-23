@@ -33,34 +33,31 @@ PLANTS = [
      "      (arr:set! out (+ offset i) 0.0d0)))",
      "      (arr:set! out (+ offset i) (arr:aref out (+ offset i)))))"),
     (SOURCE, "the result of one evaluation allowed to be the basis's own knots",
-     "                  (or (unsafe-pointer-eq? out controls)\n"
-     "                      (or (unsafe-pointer-eq? rows knots) (unsafe-pointer-eq? out knots)))))",
-     "                  (or (unsafe-pointer-eq? out controls)\n"
-     "                      (or (unsafe-pointer-eq? rows knots) (unsafe-pointer-eq? rows knots)))))"),
+     "(unsafe-pointer-eq? out controls)\n              (unsafe-pointer-eq? rows knots)\n              (unsafe-pointer-eq? out knots)",
+     "(unsafe-pointer-eq? out controls)\n              (unsafe-pointer-eq? rows knots)\n              (unsafe-pointer-eq? rows knots)"),
     (SOURCE, "the result of a batch allowed to be its parameters",
-     "                          (or (unsafe-pointer-eq? out parameters)",
-     "                          (or (unsafe-pointer-eq? rows parameters)"),
+     "(unsafe-pointer-eq? out parameters)", "(unsafe-pointer-eq? rows parameters)"),
     (SOURCE, "the rows and the result of a batch allowed to be one array",
      "    (when (or (unsafe-pointer-eq? rows out)\n"
-     "              (or (unsafe-pointer-eq? rows controls)\n"
-     "                  (or (unsafe-pointer-eq? out controls)\n"
-     "                      (or (unsafe-pointer-eq? rows parameters)",
+     "              (unsafe-pointer-eq? rows controls)\n"
+     "              (unsafe-pointer-eq? out controls)\n"
+     "              (unsafe-pointer-eq? rows parameters)",
      "    (when (or (unsafe-pointer-eq? rows controls)\n"
-     "              (or (unsafe-pointer-eq? rows controls)\n"
-     "                  (or (unsafe-pointer-eq? out controls)\n"
-     "                      (or (unsafe-pointer-eq? rows parameters)"),
+     "              (unsafe-pointer-eq? rows controls)\n"
+     "              (unsafe-pointer-eq? out controls)\n"
+     "              (unsafe-pointer-eq? rows parameters)"),
     (SOURCE, "an array of control points accepted when it is too long",
-     "                 (and (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)\n"
-     "                      (holds-exactly? (arr:length out) 1 order dimension)))",
-     "                 (and (>= (arr:length controls) (* (basis:control-count handle) dimension))\n"
-     "                      (holds-exactly? (arr:length out) 1 order dimension)))"),
+     "(holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)\n"
+     "                 (holds-exactly? (arr:length out) 1 order dimension)",
+     "(>= (arr:length controls) (* (basis:control-count handle) dimension))\n"
+     "                 (holds-exactly? (arr:length out) 1 order dimension)"),
     (SOURCE, "no dimension accepted",
      "    (unless (and (> dimension 0)\n"
-     "                 (and (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)\n"
-     "                      (holds-exactly? (arr:length out) 1 order dimension)))",
+     "                 (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)\n"
+     "                 (holds-exactly? (arr:length out) 1 order dimension))",
      "    (unless (and (>= dimension 0)\n"
-     "                 (and (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)\n"
-     "                      (holds-exactly? (arr:length out) 1 order dimension)))"),
+     "                 (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)\n"
+     "                 (holds-exactly? (arr:length out) 1 order dimension))"),
     (SOURCE, "the results of a batch placed a block of rows apart",
      "                   (* i out-block)))",
      "                   (* i (max out-block row-block))))"),
