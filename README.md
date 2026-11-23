@@ -36,7 +36,7 @@ reference.
 | `scripts/`, `tools/`, `toolchain.lock.json` | The check runner, the pinned toolchain it verifies, and the runner for planted defects |
 | `tests/plants/` | Rosters of planted defects, one for each batch |
 | `CONTEXT.md` | [The library's mathematical conventions and terms](CONTEXT.md) |
-| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [rosters](docs/rosters.md), [the groundwork's record](docs/batch0.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
+| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [reference texts](docs/references.md), [rosters](docs/rosters.md), [the groundwork's record](docs/batch0.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
 
 ## Checking it
 

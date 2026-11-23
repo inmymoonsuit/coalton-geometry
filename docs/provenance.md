@@ -55,6 +55,8 @@ may sit on the same machine as this checkout. Neither is a source for this libra
 
 A method is entered here before the code that uses it lands: what it is, where its
 description was read, that source's licence or status, and which file uses it.
+[The reference texts](references.md) list the works held and their editions, and where
+each planned batch expects to read; an entry here is the record that it did.
 
 | Method | Read in: work, edition, section, page, equation or algorithm | Form read | Status of that source | Used by |
 | --- | --- | --- | --- | --- |

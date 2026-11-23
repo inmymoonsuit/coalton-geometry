@@ -72,25 +72,19 @@ basis does not have it are each refused by name.
 
 ## What is needed before batch 1 can be built
 
-- **A reference text on splines.** The texts to hand cover linear algebra, numerical
-  stability and the geometry of conics and rotations, and none treats B-splines. The
-  recurrence the basis rests on is published and standard, but
-  [the provenance rule](provenance.md) asks for a citation to the page and the equation,
-  and that needs the work in hand. A text that states the method in prose and mathematics
-  serves; one whose algorithms are listings in a programming language is not read.
-  Candidates, none yet obtained or read:
-  - the two papers that introduced the recurrence: M. G. Cox, "The numerical evaluation
-    of B-splines", *J. Inst. Maths Applics* 10 (1972), and C. de Boor, "On calculating
-    with B-splines", *J. Approx. Theory* 6 (1972);
-  - H. Prautzsch, W. Boehm and M. Paluszny, *Bézier and B-Spline Techniques* (Springer,
-    2002), whose algorithms are stated as mathematics.
-
-  Two standard works are poor fits for this rule. One states its algorithms as listings
-  statement by statement, which invites exactly the comparison of structure the reviewer
-  makes; the other carries programs in a real language, which are not read. The edition
-  is to be agreed before anything is cited, so that author and reviewer hold the same one.
+- ~~**A reference text on splines.**~~ In hand since 2026-11-23: H. Prautzsch, W. Boehm
+  and M. Paluszny, *Bézier and B-Spline Techniques* (Springer, 2002). Its chapter 5 states
+  the recurrence, the convention for knots that coincide, the derivative, and the identity
+  the independent reference rests on, all as mathematics and prose with no listing, so it
+  fits [the provenance rule](provenance.md) as it stands.
+  [The reference texts](references.md) name the edition and the sections batch 1 reads,
+  and the three places where the contract departs from the text. The reviewer reads the
+  same copy.
 - **The consumer reaching it.** It comes to splines after other work of its own, and
   there is no hurry.
+
+Later batches have needs that no text to hand covers; the same page lists them. None
+blocks batch 1.
 
 ## Not planned
 

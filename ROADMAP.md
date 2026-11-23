@@ -20,8 +20,9 @@ None of this is code.
 3. ~~**The consumer's review**~~ Done 2026-11-22: it accepted [the batch plan](docs/plan.md)
    and [the first module's contract](docs/spline-basis.md), answered the contract's five
    questions, and had one convention tightened.
-4. **A reference text on splines**, for the citation the provenance rule asks for. None
-   of the texts to hand treats B-splines.
+4. ~~**A reference text on splines**~~ In hand since 2026-11-23, for the citation the
+   provenance rule asks for: [the reference texts](docs/references.md) name it, its
+   edition and the sections the first module reads.
 
 ## What a first consumer expects to need
 
