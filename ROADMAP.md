@@ -7,9 +7,10 @@
 [the nearest parameter to a point](docs/spline-nearest.md) in batch 3. The records of
 [batch 1](docs/batch1.md), [batch 2](docs/batch2.md) and [batch 3](docs/batch3.md) have
 what was measured. The
-library's first consumer has reviewed the code of both with tests of its own and found no
-defect in either. [The batch plan](docs/plan.md)
-has the order of what follows. Batch 3 is with that consumer for review. Next in the
+library's first consumer has reviewed the code of each with tests of its own and found no
+defect. [The batch plan](docs/plan.md)
+has the order of what follows. That consumer has reviewed batch 3 too and found no
+defect. Next in the
 splines are the derivatives of the nearest parameter, specified in batch 3's contract and
 not built; after them the plan's conics, rotations and measures, each beginning with a
 contract.

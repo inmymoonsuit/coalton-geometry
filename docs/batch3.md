@@ -1,9 +1,9 @@
 # Batch 3: the nearest parameter of a curve to a point
 
 State: completed 2026-11-23; both complete checks pass at safety 1 and safety 0 on
-Windows x86-64, SBCL 2.6.10 and the pinned Coalton compiler. With the library's first
-consumer for review, with four changes to the derivation it had checked for it to accept
-or refuse.
+Windows x86-64, SBCL 2.6.10 and the pinned Coalton compiler. The library's first
+consumer has reviewed the code with a reference and tests of its own and found no defect:
+[below](#the-consumers-review).
 
 ## What was built
 
@@ -168,6 +168,38 @@ Each is in the contract, marked where it stands, for the consumer's review.
 5. **A chapter named to be read was not read.** The draft's provenance named a chapter on
    Newton's method in floating point. Nothing in the search rests on it, and the contract
    now says what the search's step is derived from.
+
+## The consumer's review
+
+Held back from the author and run on the commit as pushed, 2026-11-23. Its figures, as it
+reported them:
+
+- 2,574 checks, none failed, and no compiler warning.
+- **A reference of its own, by a third route**: each span's squared distance as an
+  interpolated rational polynomial, its derivative in Bernstein form, the roots isolated
+  by exact subdivision with Descartes' rule on the coefficients and narrowed by exact
+  bisection to 2^-90. This library's reference uses a Sturm chain; neither uses the
+  module's bounds.
+- Exact ties by construction, a curve of one dimension folding back and two symmetric
+  curves of the plane with the point on the axis, at a tie of 10^-9, of zero, and of zero
+  with a step of 10^-6; curves of the plane with no hint, the right one and a wrong one;
+  degrees 2 to 5 and dimensions 1 to 3, a third of them 10^6 from the origin. Reports: 503
+  feet, 42 starts, 54 ends, 37 ties, none unresolved.
+- **The floor of a candidate, checked by hand and found sound**, with the rounding of the
+  code that forms it: the drop is raised by the margin before the subtraction and the root
+  lowered after.
+- Three plants of its own, all caught: the original flaw; ties never reported; and the
+  speed of a span halved, by which a symmetric tie was missed and nearest points lost.
+- **Its own first run did not catch the original flaw either.** Its tie cases converged to
+  the crossing exactly, so the two computed distances agreed and the flaw could not show;
+  cases with a coarse step were added for it. That is the same thing this record found
+  from the other side: the flaw shows only where a returned parameter is not the least
+  point.
+
+It accepted the budget and the two limits this record states, that a greatest distance
+within the tie leaves a point unresolved and that ties are over-reported only; it hands a
+step back on both. The underflow device and the rule for a Newton step it did not speak of
+apart from finding no defect.
 
 ## What went wrong in the tests themselves
 

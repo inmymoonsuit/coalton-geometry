@@ -4,8 +4,9 @@
 whose shape the library's first consumer accepted and whose derivation it checked by hand.
 [The record](batch3.md) has what was measured. `differentiate!` is specified here and not
 built. Building it changed the derivation in four places after that check, each marked
-where it stands and [listed at the end](#as-built-what-changed-after-the-derivation-was-checked)
-for the consumer's review.
+where it stands and [listed at the end](#as-built-what-changed-after-the-derivation-was-checked).
+The consumer has since checked the first of them by hand, accepted the second, and
+reviewed the code with a reference of its own and found no defect.
 
 Package `coalton-geometry/spline/nearest`. It stands on [the curve module](spline-curve.md)
 and [the basis module](spline-basis.md), and on [the conventions](../CONTEXT.md#curves):
@@ -454,8 +455,9 @@ contract to be written to.
 
 ## As built: what changed after the derivation was checked
 
-Four things, each found by building or by the tests, and each for the consumer to accept
-or refuse. The interface is as it accepted it but for the second.
+Four things, each found by building or by the tests. The interface is as the consumer
+accepted it but for the second. On 2026-11-23 it checked the first by hand and found it
+sound, accepted the second, and found no defect in a review that covered all four.
 
 1. **A candidate is not its least point.** The tie rule compared distances computed at
    returned parameters. A least point is only near its parameter, so each candidate now
