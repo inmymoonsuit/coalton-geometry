@@ -1,5 +1,6 @@
 (cl:defpackage #:coalton-geometry/spline/basis
   (:use #:coalton #:coalton-prelude)
+  (:import-from #:coalton-geometry/internal/scaled #:split-binary #:scale-binary #:add-binary)
   (:local-nicknames (#:arr #:coalton/lisparray) (#:math #:coalton/math))
   (:export #:Basis #:make-basis
            #:BasisError #:DegreeBelowOne #:TooFewKnots #:KnotNotFinite #:KnotsDecrease
@@ -62,6 +63,7 @@
     (table (arr:LispArray F64))
     (stage (arr:LispArray F64))
     (ratio (arr:LispArray F64))
+    (exponents (arr:LispArray IFix))
     (held (arr:LispArray F64))
     (state (arr:LispArray UFix)))
 
@@ -142,6 +144,7 @@
                            (arr:make (* width width) 0.0d0)
                            (arr:make (* (+ (min order degree) 1) width) 0.0d0)
                            (arr:make width 0.0d0)
+                           (arr:make width (the IFix 0))
                            (arr:make 1 0.0d0)
                            state)))
 
@@ -244,6 +247,47 @@
       ((and (<= order p) (<= (multiplicity store span) (- p order))) BasisSuccess)
       (True BasisDerivativeUndefined)))
 
+  (declare retry-derivatives! (BasisStorage * UFix * UFix -> Boolean))
+  (define (retry-derivatives! store span rows)
+    "Repeat the derivative steps with a separate binary exponent; a lower-degree quotient need not fit if the requested derivative does."
+    (let p = (.p store))
+    (let width = (+ p 1))
+    (let above = (+ span 1))
+    (let stage = (.stage store))
+    (let ratio = (.ratio store))
+    (let exps = (.exponents store))
+    (let knot = (.knot store))
+    (for ((m 1 (+ m 1))) :while (< m rows)
+      (let base = (* m width))
+      (let start = (- p m))
+      (for ((r 0 (+ r 1))) :while (<= r start)
+        (arr:set! stage (+ base r) (arr:aref (.table store) (+ (* start width) r)))
+        (arr:set! exps r 0))
+      (for ((d (+ start 1) (+ d 1))) :while (<= d p)
+        (let first = (- above d))
+        (let factor = (count->float d))
+        (for ((i 0 (+ i 1))) :while (< i d)
+          (let (values divisor shift) =
+            (split-binary (- (arr:aref knot (+ above i)) (arr:aref knot (+ first i)))))
+          (let (values numerator power) = (split-binary (arr:aref stage (+ base i))))
+          (let (values part extra) = (split-binary (/ numerator divisor)))
+          (arr:set! ratio i part)
+          (arr:set! exps i (+ (+ (arr:aref exps i) (- power shift)) extra)))
+        (arr:set! stage (+ base d) (* factor (arr:aref ratio (- d 1))))
+        (arr:set! exps d (arr:aref exps (- d 1)))
+        (for ((r (- d 1) (- r 1))) :while (> r 0)
+          (let (values part shift) = (add-binary (arr:aref ratio (- r 1)) (arr:aref exps (- r 1))
+                                                 (negate (arr:aref ratio r)) (arr:aref exps r)))
+          (arr:set! stage (+ base r) (* factor part))
+          (arr:set! exps r shift))
+        (arr:set! stage base (* factor (negate (arr:aref ratio 0)))))
+      (for ((r 0 (+ r 1))) :while (< r width)
+        (let entry = (scale-binary (arr:aref stage (+ base r)) (arr:aref exps r)))
+        (unless (inline (math:finite? entry))
+          (return False))
+        (arr:set! stage (+ base r) entry)))
+    True)
+
   (declare fill! (BasisStorage * UFix * UFix -> Boolean))
   (define (fill! store span rows)
     "Compute into the stage, for the held parameter on this span, the values and then each derivative up to rows - 1, rows being at most the degree and one. False when a derivative is not a finite number."
@@ -296,7 +340,7 @@
         (arr:set! stage base (* scale (- 0.0d0 (arr:aref ratio 0))))))
     (for ((i width (+ i 1))) :while (< i (* rows width))
       (unless (inline (math:finite? (arr:aref stage i)))
-        (return False)))
+        (return (retry-derivatives! store span rows))))
     True)
 
   (declare deliver! (BasisStorage * UFix * UFix * arr:LispArray F64 * UFix -> Void))

@@ -21,10 +21,8 @@ PLANTS = [
      "    (let first = (- (basis:latest-span handle) p))",
      "    (let first = (+ (- (basis:latest-span handle) p) 1))"),
     (SOURCE, "a second derivative written from the row of the first",
-     "        (arr:set! out (+ offset (+ (* m dimension) c))\n"
-     "                  (combine rows (+ at (* m width)) controls (+ (* first dimension) c) dimension width))))",
-     "        (arr:set! out (+ offset (+ (* m dimension) c))\n"
-     "                  (combine rows (+ at (* (min m 1) width)) controls (+ (* first dimension) c) dimension width))))"),
+     "        (let coord = (combine rows row controls from dimension width))",
+     "        (let coord = (combine rows (if (> m 1) (+ at width) row) controls from dimension width))"),
     (SOURCE, "a result that is not finite written as it is",
      "    (unless (sums-finite? rows 0 controls first dimension width computed)",
      "    (unless (or (> width 0) (sums-finite? rows 0 controls first dimension width computed))"),

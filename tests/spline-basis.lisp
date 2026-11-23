@@ -550,6 +550,14 @@ Returns the numbers of knot vectors and of parameters tried."
 other. They are held to the same bounds: this is where the underflow terms of both are what is being checked, and
 the number of derivatives that needed theirs is printed."
   (let ((record (make-basis-record)) (vectors 0))
+    ;; The degree-one intermediate 1/h overflows; after division by a wide
+    ;; knot interval every requested second derivative (and its S) fits.
+    (let* ((h (expt 2d0 -1030)) (u (/ h 2))
+           (knots (doubles -1024d0 -1024d0 -1024d0 0d0 h 1024d0 1024d0 1024d0))
+           (handle (basis:make-basis 2 knots 2)) (parameters (doubles u)) (out (basis-sentinel 9))
+           (tally (indices 0)))
+      (basis-check-parameter handle knots (map 'vector #'rational knots) 2 u 2 record)
+      (assert (zerop (bytes-a-call (lambda (n) (bc:evaluate-loop handle parameters 2 out tally n)) 20000))))
     (loop :for (degree multiplicities exponents)
             :in '((1 (2 1 1 2) (-1000 0 0))
                   (2 (3 1 1 3) (-1040 -520 0))

@@ -70,8 +70,8 @@ PLANTS = [
      "    (when (unsafe-pointer-eq? out parameters)",
      "    (when (and (> order (.limit store)) (unsafe-pointer-eq? out parameters))"),
     (SOURCE, "a derivative too large to hold delivered as it is",
-     "      (unless (inline (math:finite? (arr:aref stage i)))\n        (return False)))\n    True)",
-     "      (unless (or (> i 0) (inline (math:finite? (arr:aref stage i))))\n        (return False)))\n    True)"),
+     "      (unless (inline (math:finite? (arr:aref stage i)))\n        (return (retry-derivatives!",
+     "      (unless (or (> i 0) (inline (math:finite? (arr:aref stage i))))\n        (return (retry-derivatives!"),
     (SOURCE, "the latest span cleared by a call that is then refused",
      "    (let status = (admit store order))\n    (unless (== status BasisSuccess)\n      (return status))\n"
      "    (let span = (locate! store))",

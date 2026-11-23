@@ -1,5 +1,6 @@
 (cl:defpackage #:coalton-geometry/spline/curve
   (:use #:coalton #:coalton-prelude)
+  (:import-from #:coalton-geometry/internal/scaled #:split-binary #:scale-binary #:add-binary)
   (:local-nicknames (#:arr #:coalton/lisparray) (#:cell #:coalton/cell) (#:math #:coalton/math)
                     (#:basis #:coalton-geometry/spline/basis))
   (:export #:evaluate! #:evaluate-batch!))
@@ -18,6 +19,26 @@
     "Whether an array of this many entries is this many blocks of order + 1 rows of this width. The product is formed in integers of any size, so nothing wraps."
     (lisp (-> Boolean) (entries blocks order width) (cl:= entries (cl:* blocks (cl:+ order 1) width))))
 
+  (declare combine-wide! (arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * UFix * UFix
+                         * Boolean * arr:LispArray F64 * UFix -> Boolean))
+  (define (combine-wide! rows at controls from stride width write? out dest)
+    (let part = (cell:new 0.0d0))
+    (let shift = (cell:new (the IFix 0)))
+    (for ((r 0 (+ r 1))) :while (< r width)
+      (let coordinate = (arr:aref controls (+ from (* r stride))))
+      (unless (inline (math:finite? coordinate))
+        (return False))
+      (let (values x ex) = (split-binary (arr:aref rows (+ at r))))
+      (let (values y ey) = (split-binary coordinate))
+      (let (values z ez) = (add-binary (cell:read part) (cell:read shift) (* x y) (+ ex ey)))
+      (cell:write! part z)
+      (cell:write! shift ez))
+    (let result = (scale-binary (cell:read part) (cell:read shift)))
+    (unless (inline (math:finite? result))
+      (return False))
+    (when write? (arr:set! out dest result))
+    True)
+
   (inline)
   (declare combine (arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * UFix * UFix -> F64))
   (define (combine rows at controls from dimension width)
@@ -33,8 +54,11 @@
     "Whether every coordinate of the point and of each derivative that is computed, from the block of rows at this offset, is a finite number. Writes nothing. A control point of the span with a coordinate that is not finite makes a sum that is not: every sum takes every control point of the span, and nothing times a number that is not finite is finite."
     (for ((m 0 (+ m 1))) :while (< m computed)
       (for ((c 0 (+ c 1))) :while (< c dimension)
-        (unless (inline (math:finite? (combine rows (+ at (* m width)) controls (+ (* first dimension) c) dimension width)))
-          (return False))))
+        (let row = (+ at (* m width)))
+        (let from = (+ (* first dimension) c))
+        (unless (inline (math:finite? (combine rows row controls from dimension width)))
+          (unless (combine-wide! rows row controls from dimension width False rows 0)
+            (return False)))))
     True)
 
   (declare write-sums! (arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * UFix * UFix * UFix * UFix
@@ -43,8 +67,13 @@
     "Write into out from this offset the point and each derivative that is computed, and zero for every order above the degree."
     (for ((m 0 (+ m 1))) :while (< m computed)
       (for ((c 0 (+ c 1))) :while (< c dimension)
-        (arr:set! out (+ offset (+ (* m dimension) c))
-                  (combine rows (+ at (* m width)) controls (+ (* first dimension) c) dimension width))))
+        (let row = (+ at (* m width)))
+        (let from = (+ (* first dimension) c))
+        (let dest = (+ offset (+ (* m dimension) c)))
+        (let coord = (combine rows row controls from dimension width))
+        (cond
+          ((inline (math:finite? coord)) (arr:set! out dest coord))
+          (True (combine-wide! rows row controls from dimension width True out dest) (values)))))
     (for ((i (* computed dimension) (+ i 1))) :while (< i (* (+ order 1) dimension))
       (arr:set! out (+ offset i) 0.0d0)))
 

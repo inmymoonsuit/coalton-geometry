@@ -2,6 +2,16 @@
 
 Changes a caller can meet.
 
+## Unreleased
+
+`nearest!` no longer certifies a wrong endpoint or hides an exact tie when a residual
+or squared distance overflows. An ambiguous endpoint may be `unresolved`; a clamped
+endpoint also has a tighter sign test. Poor hints no longer displace the unhinted
+search's starting bounds. Span bounds are not built for empty or zero-budget batches.
+The basis and curve evaluators retry overflowing derivative intermediates with a
+separate exponent instead of refusing merely because an intermediate did not fit.
+The public signatures and the refusal/write guarantees are unchanged.
+
 ## 0.3.0 — 2026-11-23
 
 New package `coalton-geometry/spline/nearest`: `make-search` and `nearest!` give, for a

@@ -53,6 +53,14 @@ may sit on the same machine as this checkout. Neither is a source for this libra
 
 ## The register
 
+The range corrections below use the same defining recurrences, not another spline
+algorithm: write a double as a signed significand times a power of two, carry the
+exponent separately through a quotient or sum, and restore it at the output. The
+normalized distance floor and the clamped-end sign test in the search contract are
+algebraic rearrangements of its existing inequalities. The tests use the sign of the
+first nonzero Taylor coefficient for a polynomial's one-sided sign at a root.
+These follow directly from the identities; no other implementation was consulted.
+
 A method is entered here before the code that uses it lands: what it is, where its
 description was read, that source's licence or status, and which file uses it.
 [The reference texts](references.md) list the works held and their editions, and where

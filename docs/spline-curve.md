@@ -87,10 +87,9 @@ formed twice for that guarantee. `rows` holds true basis values whenever it is w
 *As built.* **After a single call refused for a control point or a result, the basis's
 `latest-span` is that parameter's span**: the basis's own call succeeded and wrote `rows`.
 
-*As built.* **A control point that is not finite is found through the sums, not looked for
-apart from them.** Every sum takes every control point of the span, and nothing times a
-number that is not finite is finite, so the check of the sums is the check of the control
-points. A separate check was written first; it could change no outcome, and was removed.
+**There is no separate scan of the control points.** Every sum takes every control point
+of the span. A non-finite coordinate makes the ordinary sum non-finite, and the
+range-extended retry rejects that coordinate before decomposing it.
 
 An output that is one of the call's inputs is the basis module's typed error,
 `OutputAliased`, raised before anything else is asked: `rows` or `out` that is `controls`,
@@ -105,8 +104,11 @@ module does not look: it would be deciding from the control points' values, whic
 
 ## Arithmetic
 
-- Each coordinate of each result is the sum, in increasing number of control point, of
-  `p + 1` products of a basis entry and a coordinate. Nothing else is computed.
+- Each coordinate is the sum, in increasing control-point order, of `p + 1` products.
+  If an intermediate product or partial sum overflows, the same dot product is retried
+  using double significands and separate binary exponents. Thus overflow before
+  cancellation need not refuse a representable result. A non-finite input coordinate
+  of the active span still refuses the call, even if its weight is zero.
 - The basis entries are the basis module's, to its bound.
 - IEEE double with the floating-point traps off, as in the basis module.
 
