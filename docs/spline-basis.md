@@ -142,12 +142,23 @@ form `b` as written, as a quotient of two differences, and never as `1 - a`.
 A value of degree `k` therefore carries five more factors than a value of degree `k - 1`,
 and the function of degree 0 is exact. So for every basis value written,
 
-    | computed - exact |  ≤  γ(5p) × exact  +  2p × 2^-1074
+    | computed - exact |  ≤  γ(5p) × exact  +  (p + 1)(p + 2) × 2^-1074
 
-a relative bound, because nothing was subtracted that could cancel. The last term covers
-a quotient or a product that underflows, two of each at every degree, each then
-multiplied only by numbers that are at most 1; it matters only for values below the least
-normal number.
+a relative bound, because nothing was subtracted that could cancel, and a term for
+underflow that matters only for values below the least normal number.
+
+The underflow term, written out. Forming one function of one degree takes two quotients
+and two products, and each can underflow, losing at most `2^-1075`; the sum of two numbers
+that are not negative loses nothing when it is subnormal. So each function of each degree
+gains an error of at most `2 × 2^-1074` of its own. What reaches an output is that error
+times a weight. A function of degree `k` passes itself up to the two functions of degree
+`k + 1` that it feeds with weights `a` and `b` of one index, which sum to 1; so the weights
+with which one function of degree `k` reaches all the outputs sum to 1, and each is at
+most 1. An output, though, gathers from all `k + 1` functions of degree `k` that are not
+zero, each with a weight of at most 1: `k + 1` in all, and not 1, which would be the sum
+the other way. Over the degrees from 1 to `p` that is at most
+`2 (2 + 3 + … + (p + 1)) × 2^-1074`, which is `p (p + 3) × 2^-1074`, and the bound above
+rounds it up to a form that is easier to remember.
 
 **Derivatives.** A derivative is a difference, so it has no relative bound. The derivative
 of order `m` is built from the values of degree `p - m` by `m` steps, one for each degree
@@ -155,18 +166,27 @@ of order `m` is built from the values of degree `p - m` by `m` steps, one for ea
 
     D[j] = d × ( C[j] / (knot[j+d] - knot[j])  -  C[j+1] / (knot[j+d+1] - knot[j+1]) )
 
-where `C` holds the results of the step before, or the values to begin with, and a term
-whose knot difference is zero is absent. Each step adds four rounding factors: a
+where `C` holds the results of the step before, or the values of degree `p - m` to begin
+with, and a term whose knot difference is zero is absent. Each step adds four rounding factors: a
 difference of knots, a division, the multiplication by `d`, and the subtraction. With the
 `5 (p - m)` of the values it starts from, that is at most `5p` in all, whatever the order.
 So, barring underflow,
 
     | computed - exact |  ≤  γ(5p) × S
 
-where `S` is the same expression with every subtraction made an addition: the size the
-derivative would have if its terms did not cancel. `S` is computed exactly by the tests
-from the same doubles. Where knots nearly coincide `S` is large and the bound is honest
-about it. Underflow is set aside here, and not bounded as it is for the values, because a
+where `S` is the size the derivative would have if its terms did not cancel. It is defined
+by the same `m` steps with the subtraction made an addition, begun from the exact values:
+
+    S0[j] = N[j, p-m](t)                                   exactly
+    Ss[j] = d × ( S(s-1)[j] / (knot[j+d] - knot[j])  +  S(s-1)[j+1] / (knot[j+d+1] - knot[j+1]) )
+    S     = Sm[j]                    for d = p - m + s,  s = 1, …, m
+
+with the same terms absent. A test or a reviewer computes `S` in exact rational arithmetic
+from the doubles the call was given, and never from the implementation's own
+intermediates. Near a clamped end, or where knots crowd, `S` can be orders of magnitude
+above the derivative itself; the bound is then correct and weak, and every test that
+passes on it reports the ratio of `S` to the exact derivative beside the pass, so that a
+weak pass is seen to be one. Underflow is set aside here, and not bounded as it is for the values, because a
 division by a small knot difference can magnify what an earlier underflow lost; the tests
 will show whether any admitted input reaches that.
 
@@ -198,8 +218,13 @@ caller's arithmetic. The basis is evaluated at the double it is given.
   solution is the exact basis values, with no recurrence in it; differentiating the same
   identity in `t` gives the derivatives the same way. The implementation is compared with
   that solution, computed in rationals from the doubles it was given.
-- **Identities**: the values sum to one, every derivative row sums to zero, and every value
-  is in `[0, 1]`.
+- **Identities, to the bound and no tighter.** A correct implementation can return a
+  value one rounding above 1, since the last sum of a value near 1 is rounded. So: every
+  value is at least 0 and at most `1 + γ(5p)`; the values of one call, summed exactly,
+  differ from 1 by at most `γ(5p)` and the underflow terms, since each is within that
+  fraction of its own exact value and the exact values sum to 1; and each row of
+  derivatives, summed exactly, differs from 0 by at most `γ(5p)` times the sum of its
+  `S`.
 - **The scale sweep**: knots and parameters multiplied by a power of two leave the spans
   and values exactly as they were, and divide the derivative of order `k` by that power
   `k` times, across the range.
