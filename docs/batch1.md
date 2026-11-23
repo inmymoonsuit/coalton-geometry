@@ -1,8 +1,8 @@
 # Batch 1: B-spline basis functions
 
 State: completed 2026-11-23; both complete checks pass at safety 1 and safety 0 on
-Windows x86-64, SBCL 2.6.10 and the pinned Coalton compiler. With the library's first
-consumer for review.
+Windows x86-64, SBCL 2.6.10 and the pinned Coalton compiler. The library's first consumer
+accepted the contract as built on 2026-11-23; its review of the code is still to come.
 
 ## What was built
 
@@ -163,8 +163,8 @@ checks this record rests on are of the source without it.
 
 ## What the building found
 
-Each of these is marked *as built* in [the contract](spline-basis.md#as-built-what-changed-from-the-accepted-text),
-which lists them for the consumer's review.
+Each of these is marked *as built* in [the contract](spline-basis.md#as-built-what-changed-from-the-accepted-text).
+The consumer accepted them all, and checked the derivation of the first by hand.
 
 1. **The derivatives' bound needed an underflow term.** The accepted contract set
    underflow aside for derivatives and said the tests would show whether an admitted input

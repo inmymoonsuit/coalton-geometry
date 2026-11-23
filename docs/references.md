@@ -62,10 +62,12 @@ reviewer comparing the two should expect them.
 
 ### Batch 2, `spline/curve`
 
-Prautzsch, Boehm and Paluszny: a point by repeated convex combination, 5.4, p. 63; every
-derivative of a segment at a parameter, as its Taylor expansion, 5.9, p. 70; control
-points as values of the polar form, 5.5, p. 65. **The rational half has no text here**: see
-below.
+Prautzsch, Boehm and Paluszny: a curve as the combination of its control points by the
+basis, 5.5, p. 65, which is what the module computes; a point by repeated convex
+combination, 5.4, p. 63, and the derivative as a curve one degree lower on differences of
+the control points, 5.6, p. 67, equation (1), which are the routes its exact reference
+takes; every derivative of a segment at a parameter, as its Taylor expansion, 5.9, p. 70.
+**The rational curve is not in this batch and has no text here**: see below.
 
 ### Batch 3, `spline/nearest`
 
@@ -102,9 +104,10 @@ Gray, Abbena and Salamon, chapters 10, 13 and 15; Vannucci, chapter 7.
 
 Each is a need on [the plan](plan.md) with nothing yet to cite. None blocks batch 1.
 
-- **Rational splines**, for batch 2. The point and derivatives of a rational curve follow
-  from the polynomial ones by the quotient rule, which may be all the citation needs; a
-  text that treats them would settle the conventions for weights.
+- **Rational splines**, left out of batch 2 for want of a consumer and a text. The point
+  and derivatives of a rational curve follow from the polynomial ones by the quotient
+  rule, which may be all the citation needs; a text that treats them would settle the
+  conventions for weights.
 - **A safeguarded search for the nearest parameter**, for batch 3: the global start, the
   safeguard, and the derivative of the result by the implicit function theorem.
 - **The nearest and farthest points of an ellipse**, for batch 4. The description best

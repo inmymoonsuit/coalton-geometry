@@ -3,8 +3,9 @@
 **State: built in batch 1, 2026-11-23**, to the contract the library's first consumer
 accepted on 2026-11-22. [The record](batch1.md) has what was measured. Building it
 sharpened seven clauses; each is marked *as built* where it stands, and
-[the last section](#as-built-what-changed-from-the-accepted-text) lists them for the
-consumer's review.
+[the last section](#as-built-what-changed-from-the-accepted-text) lists them. The consumer
+accepted all seven on 2026-11-23, having checked the new underflow term by hand. Its
+review of the code is still to come.
 
 Package `coalton-geometry/spline/basis`. Terms and conventions are those of
 [the conventions page](../CONTEXT.md#splines).
@@ -328,8 +329,9 @@ library's generality and not that consumer's need.
 
 ## As built: what changed from the accepted text
 
-Seven clauses, each marked where it stands. None changes what the first consumer's use
-gets: a cubic with simple interior knots, to the second order, on knots of ordinary size.
+Seven clauses, each marked where it stands, each accepted by the first consumer on
+2026-11-23. None changes what its use gets: a cubic with simple interior knots, to the
+second order, on knots of ordinary size.
 
 1. **The derivatives' bound has an underflow term, `U`.** The accepted text set underflow
    aside; an admitted input reaches it, so it is derived and tested.

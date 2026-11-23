@@ -5,7 +5,8 @@ Geometry in [Coalton](https://github.com/coalton-lang/coalton), as a library of 
 **Status: one module built.** [B-spline basis functions](docs/spline-basis.md) and their
 derivatives at a parameter, or at a batch of parameters, with an error bound that every
 number is tested against in exact arithmetic. [The batch plan](docs/plan.md) has what
-follows and [the roadmap](ROADMAP.md) what each waits for.
+follows and [the roadmap](ROADMAP.md) what each waits for. The next module,
+[a B-spline curve](docs/spline-curve.md), is a draft contract with its first consumer.
 
 | Package | What it gives | Contract |
 | --- | --- | --- |
