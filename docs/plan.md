@@ -15,8 +15,8 @@ hand, and it is built, but for the derivatives of the foot, which are left for a
 their own.
 
 **Batch 2 is the curve that is not rational.** The consumer's splines are not rational and
-no text to hand treats a rational one, so the rational curve is left out of batch 2 and
-waits for a consumer and a text.
+the rational curve is left out of batch 2. A text for it is held since
+([the reference texts](references.md)); it waits for a consumer.
 
 A batch is one module, or one coherent addition to one, delivered whole: its contract, its
 source, its tests against an independent reference, its entries in both rosters, its
@@ -97,8 +97,8 @@ basis does not have it are each refused by name.
 - ~~**The consumer reaching it.**~~ On 2026-11-23 it asked for the batch ahead of its own
   need, so that the module is reviewed and ready when it comes to splines.
 
-Later batches have needs that no text to hand covers; the same page lists them. None
-blocks batch 1.
+Later batches had needs that no text to hand covered; the same page lists them, and what
+the texts held since leave to this library.
 
 ## Not planned
 
