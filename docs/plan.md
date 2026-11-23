@@ -1,7 +1,7 @@
 # Batch plan
 
-State: proposed 2026-11-22, for review by the library's first consumer before any code.
-Nothing here is built. [The roadmap](../ROADMAP.md) has the consumer's ranking this plan
+State: reviewed and accepted by the library's first consumer on 2026-11-22. Nothing here
+is built. [The roadmap](../ROADMAP.md) has the consumer's ranking this plan
 follows; [the design notes](design.md) have the decisions every batch rests on.
 
 A batch is one module, or one coherent addition to one, delivered whole: its contract, its
@@ -27,9 +27,9 @@ consumer reaches them. Batch 1 is first because it is the smallest thing two lat
 need, and because it is where the conventions for arrays, batches and derivative layouts
 are tried on something whose right answer can be computed exactly.
 
-**A question for the consumer**: within its first rank, which does it reach first, the
-splines of batches 1 to 3 or the conics of batches 4 and 5? This plan starts with the
-splines only because they are the longer chain.
+**Splines first, by the consumer's answer.** A solver's cost on a spline is the larger
+one, since each held point is searched for many times in a step, and that is where a
+compiled routine gains most. The conics have closed forms already and come after.
 
 ## What every batch has
 
@@ -62,7 +62,8 @@ The same things, so that a reviewer knows where to look.
 
 ## Batch 1 in outline
 
-[Its draft contract](spline-basis.md) is written. In short: a handle made once for a
+[Its contract](spline-basis.md) is written and accepted, with an error bound derived
+before the code. In short: a handle made once for a
 degree and a highest derivative order owns the scratch; a call takes the knots, a
 parameter or a batch of them, and caller-owned arrays, and writes the span and the values
 of the basis functions that are not zero there, and of their derivatives. A knot vector
@@ -71,13 +72,25 @@ basis does not have it are each refused by name.
 
 ## What is needed before batch 1 can be built
 
-- **The consumer's review of this plan and of the draft contract.**
 - **A reference text on splines.** The texts to hand cover linear algebra, numerical
   stability and the geometry of conics and rotations, and none treats B-splines. The
   recurrence the basis rests on is published and standard, but
   [the provenance rule](provenance.md) asks for a citation to the page and the equation,
   and that needs the work in hand. A text that states the method in prose and mathematics
   serves; one whose algorithms are listings in a programming language is not read.
+  Candidates, none yet obtained or read:
+  - the two papers that introduced the recurrence: M. G. Cox, "The numerical evaluation
+    of B-splines", *J. Inst. Maths Applics* 10 (1972), and C. de Boor, "On calculating
+    with B-splines", *J. Approx. Theory* 6 (1972);
+  - H. Prautzsch, W. Boehm and M. Paluszny, *Bézier and B-Spline Techniques* (Springer,
+    2002), whose algorithms are stated as mathematics.
+
+  Two standard works are poor fits for this rule. One states its algorithms as listings
+  statement by statement, which invites exactly the comparison of structure the reviewer
+  makes; the other carries programs in a real language, which are not read. The edition
+  is to be agreed before anything is cited, so that author and reviewer hold the same one.
+- **The consumer reaching it.** It comes to splines after other work of its own, and
+  there is no hurry.
 
 ## Not planned
 

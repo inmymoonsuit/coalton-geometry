@@ -1,8 +1,8 @@
 # B-spline basis functions
 
-**State: draft contract for batch 1, proposed 2026-11-22. Nothing here is built.** It is
-written to be read and corrected by the library's first consumer before any code, and its
-open questions are at the end. Names and layouts are proposals until then.
+**State: contract for batch 1, accepted by the library's first consumer on 2026-11-22
+with the answers recorded at the end. Nothing here is built.** What it waits for is in
+[the batch plan](plan.md#what-is-needed-before-batch-1-can-be-built).
 
 Package `coalton-geometry/spline/basis`. Terms and conventions are those of
 [the conventions page](../CONTEXT.md#splines).
@@ -64,7 +64,8 @@ each row in increasing index of basis function. The span is then read with
 
 For `parameters`, a caller-owned array of `count` doubles: writes `count` spans into
 `spans`, and into `out` the block above for each parameter in turn, `count` blocks of
-`(order + 1)(p + 1)` doubles.
+`(order + 1)(p + 1)` doubles. `spans` is an array of unsigned integers, of another
+element type than the two arrays of doubles, so it cannot be either of them.
 
 **Every parameter is checked before anything is written.** On a refusal nothing has been
 written, and `refused-index(basis)` is the position of the first parameter that could not
@@ -93,8 +94,9 @@ times, and no more: the next one jumps.
 - **At the two ends of the domain the derivative is the one from inside the domain.** That
   is the only derivative a curve has at its end, and it is what is meant by an end
   derivative. This is a convention of this contract.
-- A caller who wants one side at an interior knot says which, with
-  `evaluate-from!(basis, side, t, order, out)`, `side` being `FromBelow` or `FromAbove`.
+- **There is no call for one side at an interior knot.** It would be the way to ask for
+  what the refusal declines, and it is left out until a consumer needs it: the first one
+  does not.
 
 ## Arithmetic
 
@@ -108,9 +110,68 @@ times, and no more: the next one jumps.
 - **The derivatives come from the same table**, by the differences the recurrence implies,
   each divided by a knot difference. Where knots nearly coincide a derivative can be too
   large to hold although every input is ordinary; that is `BasisNonFinite`.
-- **An error bound will be stated and tested**, as a multiple of the unit roundoff that
-  depends only on the degree and the order. This draft does not state one, because it has
-  not been derived yet.
+- **The error is bounded**, as derived in the next section, and the bound is what the
+  tests and the review hold the implementation to.
+
+## The error bound
+
+Derived before the code, so that the code is written to meet it. It is to be confirmed
+against the exact reference when the module is built; until then it is a derivation, not a
+measurement.
+
+Write `u` for the unit roundoff, `2^-53`, and `γ(k)` for `k u / (1 - k u)`. The model is
+the usual one for IEEE arithmetic: each of `+ - × ÷` on two doubles returns the exact
+result times `1 + δ` with `|δ| ≤ u`, and `k` such factors multiply to `1 + θ` with
+`|θ| ≤ γ(k)`. [Provenance](provenance.md#the-register) will cite where that model and
+that accumulation are stated.
+
+**Values.** The recurrence is
+
+    N[j, k](t) = a[j, k] N[j, k-1](t) + b[j+1, k] N[j+1, k-1](t)
+    a[j, k] = (t - knot[j]) / (knot[j+k] - knot[j])
+    b[j, k] = (knot[j+k] - t) / (knot[j+k] - knot[j])
+
+starting from the one function of degree 0 that is 1 on the span. The implementation must
+form `b` as written, as a quotient of two differences, and never as `1 - a`.
+
+- Each of `a` and `b` is two subtractions of exact inputs and one division: three
+  rounding factors.
+- Each product with a value of the degree below adds one, and brings that value's own.
+- The sum is of two numbers that are not negative, so it adds one and cannot cancel.
+
+A value of degree `k` therefore carries five more factors than a value of degree `k - 1`,
+and the function of degree 0 is exact. So for every basis value written,
+
+    | computed - exact |  ≤  γ(5p) × exact  +  2p × 2^-1074
+
+a relative bound, because nothing was subtracted that could cancel. The last term covers
+a quotient or a product that underflows, two of each at every degree, each then
+multiplied only by numbers that are at most 1; it matters only for values below the least
+normal number.
+
+**Derivatives.** A derivative is a difference, so it has no relative bound. The derivative
+of order `m` is built from the values of degree `p - m` by `m` steps, one for each degree
+`d` from `p - m + 1` to `p`, each of the form
+
+    D[j] = d × ( C[j] / (knot[j+d] - knot[j])  -  C[j+1] / (knot[j+d+1] - knot[j+1]) )
+
+where `C` holds the results of the step before, or the values to begin with, and a term
+whose knot difference is zero is absent. Each step adds four rounding factors: a
+difference of knots, a division, the multiplication by `d`, and the subtraction. With the
+`5 (p - m)` of the values it starts from, that is at most `5p` in all, whatever the order.
+So, barring underflow,
+
+    | computed - exact |  ≤  γ(5p) × S
+
+where `S` is the same expression with every subtraction made an addition: the size the
+derivative would have if its terms did not cancel. `S` is computed exactly by the tests
+from the same doubles. Where knots nearly coincide `S` is large and the bound is honest
+about it. Underflow is set aside here, and not bounded as it is for the values, because a
+division by a small knot difference can magnify what an earlier underflow lost; the tests
+will show whether any admitted input reaches that.
+
+**What the bound does not cover**: a parameter that is itself the rounded result of the
+caller's arithmetic. The basis is evaluated at the double it is given.
 
 ## The four questions, and the fifth
 
@@ -161,16 +222,22 @@ the copy of the knots and a workspace quadratic in the degree.
 - Periodic splines as such. A knot vector that happens to be uniform is accepted like any
   other; nothing wraps.
 
-## Open questions for the consumer
+## Settled with the first consumer
 
-1. **Is the sided call needed?** A solver's iterate lands exactly on a knot rarely, but a
-   starting value often does. Is a refusal at an interior knot enough, with the solver
-   stepping off it, or does it want `evaluate-from!`?
-2. **Is one handle for each knot vector right?** It copies and checks the knots once. A
-   consumer that changes knots at every step would rather pass them to each call and pay
-   the check each time.
-3. **The layout of `out`**: all values, then all first derivatives, as proposed, or for
-   each basis function its value and its derivatives together?
-4. **The highest order ever wanted.** Two covers tangency and curvature. Is a third
-   derivative ever asked for?
-5. **Is degree 1 enough as the least**, or is a degree-0 basis ever wanted for uniformity?
+Its answers to the five questions this contract was sent with, 2026-11-22.
+
+1. **The sided call is not needed**, and is left out. The consumer's splines are cubic
+   with simple interior knots, so every derivative to the second order exists at every
+   knot and it never meets the refusal at the orders it asks for. The refusal stays.
+2. **One handle for each knot vector is right.** Its knots change only when a control
+   point is added or removed, never within a step.
+3. **The layout is as proposed**: all values, then all first derivatives, then all second.
+   It forms a point and each derivative as a sum over a row.
+4. **The highest order it asks for is 2.** The handle's `order` argument covers anything
+   later.
+5. **Degree 1 as the least is enough.** It uses degree 3 only.
+
+Its use is one case of this contract and not its extent: a cubic on `[0, 1]` with a
+uniform clamped knot vector. The tests cover every degree, multiplicity and spacing the
+contract admits, and the scale sweep exercises knots far from that interval, which is the
+library's generality and not that consumer's need.

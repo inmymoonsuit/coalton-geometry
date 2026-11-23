@@ -17,9 +17,9 @@ None of this is code.
 2. **What the design notes still leave open**, where the first module meets it: the
    layout of a derivative in its array, how near to degenerate counts, and the
    mathematical conventions, fixed in each contract.
-3. **The consumer's review** of [the batch plan](docs/plan.md) and of
-   [the first module's draft contract](docs/spline-basis.md), which ends in five
-   questions to it. Both are written and waiting to be read. No code before its answer.
+3. ~~**The consumer's review**~~ Done 2026-11-22: it accepted [the batch plan](docs/plan.md)
+   and [the first module's contract](docs/spline-basis.md), answered the contract's five
+   questions, and had one convention tightened.
 4. **A reference text on splines**, for the citation the provenance rule asks for. None
    of the texts to hand treats B-splines.
 

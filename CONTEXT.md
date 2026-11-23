@@ -32,11 +32,19 @@ until then.
 - **A parameter runs over a closed interval**, the curve's domain, in the direction of
   increasing parameter. A parameter outside the domain is refused; it is never clamped
   into it.
-- *Provisional.* **A circle or an ellipse is parametrized by angle from its first axis,
-  counter-clockwise**, the parameter of a point taken in `[0, 2π)`.
-- *Provisional.* **An arc is given by its curve and a parameter interval**, traversed with
-  increasing parameter. An arc through the angle where the parameter wraps has an end
-  parameter above `2π`.
+- *Provisional.* **An ellipse is parametrized by its eccentric angle, not by the polar
+  angle of the point.** With centre `c`, semi-axes `a` and `b` along the ellipse's own
+  first and second axes, and `R` the rotation taking the coordinate axes to those, the
+  point at parameter `t` is `c + R (a cos t, b sin t)`. A circle is the case `a = b`,
+  where the two angles agree.
+- *Provisional.* **The parameter of a point of an ellipse is the principal value**
+  `atan2(y / b, x / a)`, with `(x, y)` the point in the ellipse's own axes about its
+  centre. It lies in `(-π, π]`, and its seam is on the negative first axis.
+- *Provisional.* **An arc is a start parameter `t0` in `(-π, π]` and an end parameter
+  `t1` with `t0 < t1 ≤ t0 + 2π`**, traversed with increasing parameter, which is
+  counter-clockwise. An arc that crosses the seam therefore has an end parameter above
+  `π`, as large as `3π`. A point of the arc has the one parameter in `[t0, t1]` that is
+  its principal value or that plus `2π`.
 - **A nearest point is a foot**: a point of the curve where the line to the given point is
   perpendicular to the curve, or an end of the domain. *Nearest* means the foot of least
   distance. Where two feet are at the same least distance the nearest point is not unique,
