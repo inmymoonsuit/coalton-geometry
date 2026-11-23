@@ -83,7 +83,8 @@ Named so that the boundary can be argued about, not as a plan.
 The check runner, the dependency registration, the toolchain checker and the two rosters'
 machinery were copied from coalton-linalg, so that this repository can be cloned and
 checked alone. They are two copies now. If the same change is ever needed in both, that is
-the moment to lift them into one place both depend on, and not before.
+the moment to lift them into one place both depend on, and not before. Until then each
+library tells the other before changing its copy in a way the other should follow.
 
 Hosted continuous integration on the pinned toolchain is wanted by both and built by
 neither.

@@ -3,9 +3,8 @@
 The decisions every interface of this library rests on, made once, before the first
 module. Each says whether it is **decided** or **open**, and a decided one says on what
 evidence and who agreed. The first consumer of the library and the session that reviews
-its batches signed the decided ones on 2026-11-22, each with terms that are written in.
-The maintainer of the sister library was asked and had not answered when this was
-written.
+its batches signed the decided ones on 2026-11-22, and so did the session that builds the
+sister library, each with terms that are written in.
 
 ## Scope — decided
 
@@ -146,6 +145,14 @@ in is fitting, spline interpolation or the eigenproblem of a conic, and none is 
 for. Adding a dependency later breaks no caller. Declaring one now would make every
 consumer load the sister library for nothing and tie the two libraries' versions
 together.
+
+Two terms from the sister library's side, agreed:
+
+- **Only its public packages are ever used.** Its internal package of floating-point
+  constants and helpers changes without notice. What this library needs of that kind it
+  keeps for itself, or asks to have made public.
+- **The tooling the two share is two copies** until one change is first needed in both.
+  Each side tells the other before changing its copy in a way the other should follow.
 
 ## Agreement with an implementation a consumer already has — decided
 
