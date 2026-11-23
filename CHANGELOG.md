@@ -2,6 +2,14 @@
 
 Changes a caller can meet.
 
+## 0.2.0 — 2026-11-23
+
+New package `coalton-geometry/spline/curve`: `evaluate!` and `evaluate-batch!` give a point
+of a B-spline curve in any dimension and its derivatives with respect to the parameter,
+and the basis rows that are its derivatives with respect to the control points, with the
+refusals and the error bound of [its contract](docs/spline-curve.md). The basis module is
+unchanged. [Batch 2's record](docs/batch2.md) has the measurements.
+
 ## 0.1.0 — 2026-11-23
 
 The first module. New package `coalton-geometry/spline/basis`: `make-basis`, `evaluate!`

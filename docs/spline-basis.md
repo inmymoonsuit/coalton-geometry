@@ -4,8 +4,9 @@
 accepted on 2026-11-22. [The record](batch1.md) has what was measured. Building it
 sharpened seven clauses; each is marked *as built* where it stands, and
 [the last section](#as-built-what-changed-from-the-accepted-text) lists them. The consumer
-accepted all seven on 2026-11-23, having checked the new underflow term by hand. Its
-review of the code is still to come.
+accepted all seven on 2026-11-23, having checked the new underflow term by hand, and its
+own held-back review of the code found no defect; [the record](batch1.md#the-consumers-review)
+has its figures.
 
 Package `coalton-geometry/spline/basis`. Terms and conventions are those of
 [the conventions page](../CONTEXT.md#splines).

@@ -157,7 +157,25 @@ expected of each pair that can be one array. An entry of (key :exempt reason) ha
          (lambda () (list (doubles) (indices) (doubles)))
          (let ((handle (basis:make-basis 2 (doubles 0d0 0d0 0d0 1d0 1d0 1d0) 1)))
            (lambda (a) (bc:batch-code handle (first a) 1 (second a) (third a))))
-         '(((0 2) :refused)))))
+         '(((0 2) :refused)))
+   ;; A segment in the plane to the first order: two control points, four rows, a point and a
+   ;; derivative. All three arrays then have four entries, so every pair can be one array, and
+   ;; each has an output in it.
+   (list "coalton-geometry/spline/curve:evaluate!"
+         (lambda () (list (doubles 0.25d0 0.5d0 0.75d0 1d0) (doubles 0d0 0d0 0d0 0d0) (doubles 0d0 0d0 0d0 0d0)))
+         (let ((handle (basis:make-basis 1 (doubles 0d0 0d0 1d0 1d0) 1)))
+           (lambda (a) (cc:evaluate-code handle (first a) 2 0.25d0 1 (second a) (third a))))
+         '(((0 1) :refused) ((0 2) :refused) ((1 2) :refused)))
+   ;; The same segment at four parameters. The control points and the parameters are both only
+   ;; read, and here they have one length and can be one array: four numbers that are two points
+   ;; and are also four parameters of the domain. The rows and the result have sixteen entries each.
+   (list "coalton-geometry/spline/curve:evaluate-batch!"
+         (lambda () (list (doubles 0.25d0 0.5d0 0.75d0 1d0) (doubles 0.25d0 0.5d0 0.75d0 1d0) (indices 9 9 9 9)
+                          (make-array 16 :element-type 'double-float :initial-element 0d0)
+                          (make-array 16 :element-type 'double-float :initial-element 0d0)))
+         (let ((handle (basis:make-basis 1 (doubles 0d0 0d0 1d0 1d0) 1)))
+           (lambda (a) (cc:batch-code handle (first a) 2 (second a) 1 (third a) (fourth a) (fifth a))))
+         '(((0 1) :same) ((3 4) :refused)))))
 
 (defun alias-missing (inventory keys)
   "Members of the inventory the roster does not name, and names in the roster that are not members."

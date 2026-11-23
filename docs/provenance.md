@@ -65,6 +65,9 @@ each planned batch expects to read; an entry here is the record that it did.
 | Marsden's identity, from which the tests' exact reference is solved as a linear system | The same: section 5.12, p. 75, Problem 4; and section 5.8, p. 69, which generalises it | Mathematics | As above | `tests/spline-basis.lisp` |
 | The model of rounding, with and without underflow, and the accumulation of rounding factors that the error bound is stated in | Higham, *Accuracy and Stability of Numerical Algorithms*, second edition, SIAM 2002: section 2.2, p. 40, equation (2.4); section 3.1, p. 63, Lemma 3.1; and the notes to chapter 2, p. 56, equation (2.8) | Mathematics | As above | `docs/spline-basis.md`, `tests/spline-basis.lisp` |
 
+| A curve as the combination of its control points by the basis functions, which is what the curve module computes, and its derivative by the derivatives of those functions | Prautzsch, Boehm and Paluszny, as above: section 5.4, p. 63, the linear combination the section opens with; section 5.6, p. 67 | Mathematics | As above | `src/spline/curve.ct` |
+| A point of a curve by repeated convex combination of its control points, and a derivative as the curve one degree lower on scaled differences of them: the two routes of the tests' exact reference | The same: section 5.4, p. 64, the affine combinations and their coefficient; section 5.6, p. 67, equation (1) | Mathematics | As above | `tests/spline-curve.lisp` |
+
 **What the first two entries do not cover, because no text was read for it.** The text
 gives the recurrence as a definition, not as a procedure. How the computation is arranged
 is this library's, worked out from that definition and from what the contract's error

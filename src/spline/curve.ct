@@ -1,0 +1,114 @@
+(cl:defpackage #:coalton-geometry/spline/curve
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:cell #:coalton/cell) (#:math #:coalton/math)
+                    (#:basis #:coalton-geometry/spline/basis))
+  (:export #:evaluate! #:evaluate-batch!))
+(cl:in-package #:coalton-geometry/spline/curve)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; A point of a B-spline curve and its derivatives with respect to the parameter: the control
+;;; points combined by the basis module's rows. docs/spline-curve.md is the contract and derives
+;;; the error bound; docs/provenance.md says where the method was read. The module has no handle
+;;; and allocates nothing.
+
+(coalton-toplevel
+  (inline)
+  (declare holds-exactly? (UFix * UFix * UFix * UFix -> Boolean))
+  (define (holds-exactly? entries blocks order width)
+    "Whether an array of this many entries is this many blocks of order + 1 rows of this width. The product is formed in integers of any size, so nothing wraps."
+    (lisp (-> Boolean) (entries blocks order width) (cl:= entries (cl:* blocks (cl:+ order 1) width))))
+
+  (inline)
+  (declare combine (arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * UFix * UFix -> F64))
+  (define (combine rows at controls from dimension width)
+    "The sum, in increasing number of control point, of width products: the row entry at + r times the coordinate at from + r dimension."
+    (let sum = (cell:new 0.0d0))
+    (for ((r 0 (+ r 1))) :while (< r width)
+      (cell:write! sum (+ (cell:read sum)
+                          (* (arr:aref rows (+ at r)) (arr:aref controls (+ from (* r dimension)))))))
+    (cell:read sum))
+
+  (declare sums-finite? (arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * UFix * UFix * UFix -> Boolean))
+  (define (sums-finite? rows at controls first dimension width computed)
+    "Whether every coordinate of the point and of each derivative that is computed, from the block of rows at this offset, is a finite number. Writes nothing. A control point of the span with a coordinate that is not finite makes a sum that is not: every sum takes every control point of the span, and nothing times a number that is not finite is finite."
+    (for ((m 0 (+ m 1))) :while (< m computed)
+      (for ((c 0 (+ c 1))) :while (< c dimension)
+        (unless (inline (math:finite? (combine rows (+ at (* m width)) controls (+ (* first dimension) c) dimension width)))
+          (return False))))
+    True)
+
+  (declare write-sums! (arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * UFix * UFix * UFix * UFix
+                        * arr:LispArray F64 * UFix -> Void))
+  (define (write-sums! rows at controls first dimension width computed order out offset)
+    "Write into out from this offset the point and each derivative that is computed, and zero for every order above the degree."
+    (for ((m 0 (+ m 1))) :while (< m computed)
+      (for ((c 0 (+ c 1))) :while (< c dimension)
+        (arr:set! out (+ offset (+ (* m dimension) c))
+                  (combine rows (+ at (* m width)) controls (+ (* first dimension) c) dimension width))))
+    (for ((i (* computed dimension) (+ i 1))) :while (< i (* (+ order 1) dimension))
+      (arr:set! out (+ offset i) 0.0d0)))
+
+  (declare evaluate! (basis:Basis * arr:LispArray F64 * UFix * F64 * UFix * arr:LispArray F64 * arr:LispArray F64
+                      -> basis:BasisStatus))
+  (define (evaluate! handle controls dimension parameter order rows out)
+    "Write into rows what the basis module's evaluate! writes for this parameter and order, which are the derivatives of the curve with respect to the control points of the span; and into out the point of the curve with these control points, then its first derivative with respect to the parameter, and so on to the order, dimension numbers each. out is written only on BasisSuccess. See docs/spline-curve.md."
+    (let knots = (basis:knots handle))
+    (when (or (unsafe-pointer-eq? rows out)
+              (or (unsafe-pointer-eq? rows controls)
+                  (or (unsafe-pointer-eq? out controls)
+                      (or (unsafe-pointer-eq? rows knots) (unsafe-pointer-eq? out knots)))))
+      (throw (basis:OutputAliased "An output of a curve call is one of its inputs, or its other output.")))
+    (when (> order (basis:highest-order handle))
+      (return basis:BasisBadOrder))
+    (unless (and (> dimension 0)
+                 (and (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)
+                      (holds-exactly? (arr:length out) 1 order dimension)))
+      (return basis:BasisBadSize))
+    (let status = (basis:evaluate! handle parameter order rows))
+    (unless (== status basis:BasisSuccess)
+      (return status))
+    (let p = (basis:degree handle))
+    (let width = (+ p 1))
+    (let first = (- (basis:latest-span handle) p))
+    (let computed = (+ (min order p) 1))
+    (unless (sums-finite? rows 0 controls first dimension width computed)
+      (return basis:BasisNonFinite))
+    (write-sums! rows 0 controls first dimension width computed order out 0)
+    basis:BasisSuccess)
+
+  (declare evaluate-batch! (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * arr:LispArray UFix
+                            * arr:LispArray F64 * arr:LispArray F64 -> basis:BasisStatus))
+  (define (evaluate-batch! handle controls dimension parameters order spans rows out)
+    "For each parameter in turn, write its span into spans, its block of basis rows into rows and its block of (order + 1) dimension numbers into out, as evaluate! lays each out. out is written only on BasisSuccess, and rows and spans only once every parameter is admitted. See docs/spline-curve.md."
+    (let knots = (basis:knots handle))
+    (let count = (arr:length parameters))
+    (when (or (unsafe-pointer-eq? rows out)
+              (or (unsafe-pointer-eq? rows controls)
+                  (or (unsafe-pointer-eq? out controls)
+                      (or (unsafe-pointer-eq? rows parameters)
+                          (or (unsafe-pointer-eq? out parameters)
+                              (or (unsafe-pointer-eq? rows knots) (unsafe-pointer-eq? out knots)))))))
+      (throw (basis:OutputAliased "An output of a curve call is one of its inputs, or its other output.")))
+    (when (> order (basis:highest-order handle))
+      (return basis:BasisBadOrder))
+    (unless (and (> dimension 0)
+                 (and (holds-exactly? (arr:length controls) (basis:control-count handle) 0 dimension)
+                      (holds-exactly? (arr:length out) count order dimension)))
+      (return basis:BasisBadSize))
+    (let status = (basis:evaluate-batch! handle parameters order spans rows))
+    (unless (== status basis:BasisSuccess)
+      (return status))
+    (when (== count 0)
+      (return basis:BasisSuccess))
+    (let p = (basis:degree handle))
+    (let width = (+ p 1))
+    (let computed = (+ (min order p) 1))
+    (let row-block = (* (+ order 1) width))
+    (let out-block = (* (+ order 1) dimension))
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (unless (sums-finite? rows (* i row-block) controls (- (arr:aref spans i) p) dimension width computed)
+        (return basis:BasisNonFinite)))
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (write-sums! rows (* i row-block) controls (- (arr:aref spans i) p) dimension width computed order out
+                   (* i out-block)))
+    basis:BasisSuccess))

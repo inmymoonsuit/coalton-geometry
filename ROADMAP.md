@@ -2,10 +2,13 @@
 
 ## Where it stands
 
-**One module is built**: [B-spline basis functions and their derivatives](docs/spline-basis.md),
-in batch 1, whose [record](docs/batch1.md) has what was measured. It is with the library's
-first consumer for review. [The batch plan](docs/plan.md) has the order of what follows;
-the next two are to go as far as a contract for that consumer's review before any code.
+**Two modules are built**: [B-spline basis functions](docs/spline-basis.md) in batch 1 and
+[B-spline curves](docs/spline-curve.md) in batch 2, with their derivatives. The records of
+[batch 1](docs/batch1.md) and [batch 2](docs/batch2.md) have what was measured. The
+library's first consumer has reviewed batch 1's code with tests of its own and found no
+defect; batch 2's is with it. [The batch plan](docs/plan.md)
+has the order of what follows; the next, the nearest parameter to a point, goes as far as a
+contract for that consumer's review before any code.
 
 ## Before a first module
 

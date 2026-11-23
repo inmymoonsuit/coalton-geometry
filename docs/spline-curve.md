@@ -1,9 +1,9 @@
 # A B-spline curve and its derivatives
 
-**State: draft contract for batch 2, sent to the library's first consumer on 2026-11-23
-for its review. Nothing here is built, and nothing is until it signs.** Its answers to the
-four questions the draft was started from are in it; the questions that remain are at the
-end.
+**State: built in batch 2, 2026-11-23**, to the contract the library's first consumer
+signed as written the same day. [The record](batch2.md) has what was measured. Building it
+changed no clause; three things the draft left unsaid are marked *as built* where they
+stand.
 
 Package `coalton-geometry/spline/curve`. It stands on
 [the basis module](spline-basis.md), whose terms and refusals it keeps, and on
@@ -58,6 +58,13 @@ of `(order + 1)(p + 1)` into `rows`, and `count` blocks of `(order + 1) × dimen
 of the first parameter that could not be evaluated, as after the basis module's own batch.
 A batch is its single calls, bit for bit.
 
+*As built.* **The position is the basis's to report, and it reports one only where its own
+batch ran.** After a batch that a parameter caused to refuse it is that parameter's
+position, and after a success it is the number of parameters. A refusal for a control
+point or a result is not a parameter's: the basis's batch succeeded, and the position is
+the number of parameters. A refusal the curve module decides before it calls the basis,
+for an order or a size of its own, leaves the position as the call before left it.
+
 ## Outcomes
 
 The statuses are the basis module's own, since every outcome but one is the basis's.
@@ -74,6 +81,14 @@ The statuses are the basis module's own, since every outcome but one is the basi
 **`out` is written only on success.** Every sum is formed once to see that it is a finite
 number, and written on a second pass; the sums are the cheapest part of a call and are
 formed twice for that guarantee. `rows` holds true basis values whenever it is written.
+
+*As built.* **After a single call refused for a control point or a result, the basis's
+`latest-span` is that parameter's span**: the basis's own call succeeded and wrote `rows`.
+
+*As built.* **A control point that is not finite is found through the sums, not looked for
+apart from them.** Every sum takes every control point of the span, and nothing times a
+number that is not finite is finite, so the check of the sums is the check of the control
+points. A separate check was written first; it could change no outcome, and was removed.
 
 An output that is one of the call's inputs is the basis module's typed error,
 `OutputAliased`, raised before anything else is asked: `rows` or `out` that is `controls`,
@@ -95,8 +110,10 @@ module does not look: it would be deciding from the control points' values, whic
 
 ## The error bound
 
-Derived before the code. It is to be confirmed against an exact reference when the module
-is built; until then it is a derivation, not a measurement.
+Derived before the code, checked by the consumer, and then confirmed against the exact
+reference: every one of 58,182 numbers from 53 knot vectors is within it, the worst at
+0.26 of the bound, and 1,601 more from control points so small that the underflow terms
+are what admits them. [The record](batch2.md) has the measurement.
 
 A basis entry carries at most `5p` rounding factors. Its product with a coordinate adds
 one, and summing `p + 1` terms adds at most `p`. So for each coordinate of the point,
@@ -105,9 +122,22 @@ control points of the span,
 
     | computed - exact |  ≤  γ(6p + 1) × Σ N[j](t) |P[j]|  +  (1 + γ(6p + 1)) × ( V × Σ |P[j]|  +  (p + 1) × 2^-1075 )
 
-where `V` is the underflow term of a basis value, `(p + 1)(p + 2) × 2^-1074`, and the last
-term is a product that underflows. For a derivative of order `m` the same holds with the
-basis module's `S[j]` in place of `N[j](t)` and its `U[j]` in place of `V`.
+For a derivative of order `m` the same holds with the basis module's `S[j]` in place of
+`N[j](t)` and its `U[j]` in place of `V`:
+
+    | computed - exact |  ≤  γ(6p + 1) × Σ S[j] |P[j]|  +  (1 + γ(6p + 1)) × ( Σ U[j] |P[j]|  +  (p + 1) × 2^-1075 )
+
+**The underflow terms, each named.**
+
+- `V`, or `U[j]`, times `|P[j]|`: a basis entry can itself be off by what underflow lost
+  in forming it, which is `V = (p + 1)(p + 2) × 2^-1074` for a value and
+  [the basis module's `U`](spline-basis.md#the-error-bound) for a derivative. The product
+  carries that loss multiplied by the coordinate.
+- `(p + 1) × 2^-1075`: each of the `p + 1` products of an entry and a coordinate can
+  underflow, and one that does is off by at most half the least positive number.
+- Nothing for the sums: a sum of doubles that is below the normal range is exact.
+- The factor `1 + γ(6p + 1)` is the rounding of the later operations acting on what an
+  earlier one lost.
 
 **The bound is relative to the size of the control points and not to the point.** The
 weights are not negative and sum to one, so the first sum is at most the largest `|P[j]|`
@@ -140,7 +170,7 @@ caller that wants more keeps its control points near its origin.
 - **Against exact rational arithmetic, by another route.** The point by repeated convex
   combination of control points, which forms no basis function; each derivative as the
   curve one degree lower on the scaled differences of the control points, evaluated the
-  same way. [The reference texts](references.md#batch-2-splinecurve) say where each is;
+  same way. [The reference texts](references.md#batch-2-splinecurve-built) say where each is;
   the first is placed by its title and is read when the batch is built. Compared to the bound above, with the sums of
   the bound computed exactly.
 - **Identities.** The point lies in the box of the span's control points, widened by the
@@ -168,9 +198,9 @@ additions. A batch looks at its parameters as the basis module's batch does.
 - Anything that changes a curve: inserting a knot, raising a degree, splitting.
 - The nearest parameter to a point: [batch 3](plan.md#the-batches).
 
-## Settled with the first consumer before this draft
+## Settled with the first consumer
 
-Its answers of 2026-11-23.
+Its answers of 2026-11-23, before the draft.
 
 1. **Control points are interleaved coordinates in one array**, a point after a point.
 2. **The plane only, for its first use**; space later. The dimension is an argument.
@@ -179,24 +209,16 @@ Its answers of 2026-11-23.
 4. **Rational weights are not in its first use.** Every spline it holds is a cubic that is
    not rational.
 
-## Questions for the consumer
+Its answers to the draft's five questions, the same day, with its signature.
 
-1. **One call that writes `rows` and `out`, or two?** This draft has the curve call write
-   the basis rows too, so that a caller wanting both makes one call and the basis is
-   evaluated once. A caller wanting only the point still passes a `rows` array. Is that
-   the shape you want, or would you call the basis module yourself and have the curve
-   module take your rows as an input?
-2. **The basis module's statuses, reused.** Every outcome is one of its six. Is one status
-   type across the two modules what you want to match on, or a type for each module?
-3. **`out` written only on success, at the price of forming each sum twice.** For a cubic
-   in the plane to the second order that is 24 more multiplications and additions a
-   parameter. Worth it to you, or would you take `out` unspecified on the one refusal that
-   can come after arithmetic, a result too large to hold?
-4. **Only the control points of the span are checked finite.** A control point that is
-   not finite elsewhere in the array goes unnoticed until a parameter reaches it. Is that
-   right for a solver whose unknowns can go bad mid-step, or do you want the whole array
-   checked on every call, at a cost proportional to the number of control points?
-5. **No handle.** The module allocates nothing and keeps nothing; the basis handle carries
-   the span and the refused position. Does the nearest-parameter search you will call next
-   want a curve handle to hold a start or a workspace? If it does, the handle belongs to
-   that batch, and this one stays as it is.
+5. **One call writes both `rows` and `out`.** It needs both, and one basis evaluation is
+   right.
+6. **The basis module's status type is reused.**
+7. **`out` is written only on success.** Forming each sum twice is nothing beside a
+   refusal that writes nothing holding everywhere.
+8. **Only the control points of the span are checked.** The others cannot change the
+   result.
+9. **No handle here.** A workspace for the search belongs to the next batch.
+
+It also checked the count of the bound, and asked that the underflow terms be written out,
+which they now are.

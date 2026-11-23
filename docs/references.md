@@ -8,7 +8,7 @@ same edition.
 
 Nothing is cited from memory. A text is listed here once it has been opened and the
 sections named below found in it. **How far each was read, as of 2026-11-23**: of the first
-text, sections 5.3, 5.5 to 5.9, 5.11, the first four problems of 5.12, and 4.8 were read as
+text, sections 5.3 to 5.9, 5.11, the first four problems of 5.12, and 4.8 were read as
 pages, and what is said of them below is what they hold; of Higham, the pages of the three
 results [the register](provenance.md#the-register) cites. Every other section on this page
 is placed by its title, or by a
@@ -60,7 +60,7 @@ reviewer comparing the two should expect them.
 - The text takes the knots as an unbounded sequence. The contract takes a finite vector
   and refuses a parameter outside its domain by name.
 
-### Batch 2, `spline/curve`
+### Batch 2, `spline/curve`, built
 
 Prautzsch, Boehm and Paluszny: a curve as the combination of its control points by the
 basis, 5.5, p. 65, which is what the module computes; a point by repeated convex

@@ -1,0 +1,59 @@
+(cl:defpackage #:coalton-geometry/tests/spline-curve-callers
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:basis #:coalton-geometry/spline/basis)
+                    (#:curve #:coalton-geometry/spline/curve))
+  (:export #:evaluate-code #:batch-code #:evaluate-loop #:batch-loop))
+(cl:in-package #:coalton-geometry/tests/spline-curve-callers)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; A caller's side of the curve module, compiled in a file and a package of its own.
+
+(coalton-toplevel
+  (declare status-code (basis:BasisStatus -> UFix))
+  (define (status-code status)
+    (match status
+      ((basis:BasisSuccess) 0)
+      ((basis:BasisOutsideDomain) 1)
+      ((basis:BasisNonFinite) 2)
+      ((basis:BasisDerivativeUndefined) 3)
+      ((basis:BasisBadOrder) 4)
+      ((basis:BasisBadSize) 5)))
+
+  (declare error-code (basis:BasisError -> UFix))
+  (define (error-code problem)
+    (match problem
+      ((basis:OutputAliased _) 8)
+      (_ 9)))
+
+  (declare evaluate-code (basis:Basis * arr:LispArray F64 * UFix * F64 * UFix * arr:LispArray F64 * arr:LispArray F64
+                          -> UFix))
+  (define (evaluate-code handle controls dimension parameter order rows out)
+    "The status of the curve's evaluate! as a number, or 100 and the number of a typed error."
+    (catch (status-code (curve:evaluate! handle controls dimension parameter order rows out))
+      ((the basis:BasisError problem) (+ 100 (error-code problem)))
+      (_ 199)))
+
+  (declare batch-code (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * arr:LispArray UFix
+                       * arr:LispArray F64 * arr:LispArray F64 -> UFix))
+  (define (batch-code handle controls dimension parameters order spans rows out)
+    "The status of the curve's evaluate-batch! as a number, or 100 and the number of a typed error."
+    (catch (status-code (curve:evaluate-batch! handle controls dimension parameters order spans rows out))
+      ((the basis:BasisError problem) (+ 100 (error-code problem)))
+      (_ 199)))
+
+  (declare evaluate-loop (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * arr:LispArray F64
+                          * arr:LispArray F64 * arr:LispArray UFix * UFix -> Void))
+  (define (evaluate-loop handle controls dimension parameters order rows out tally count)
+    "count rounds of the curve's evaluate! at each parameter in turn. The calls that do not succeed are counted into tally[0]."
+    (for ((round 0 (+ round 1))) :while (< round count)
+      (for ((i 0 (+ i 1))) :while (< i (arr:length parameters))
+        (unless (== (curve:evaluate! handle controls dimension (arr:aref parameters i) order rows out) basis:BasisSuccess)
+          (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))
+
+  (declare batch-loop (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray F64 * UFix * arr:LispArray UFix
+                       * arr:LispArray F64 * arr:LispArray F64 * arr:LispArray UFix * UFix -> Void))
+  (define (batch-loop handle controls dimension parameters order spans rows out tally count)
+    "count calls of the curve's evaluate-batch!. The calls that do not succeed are counted into tally[0]."
+    (for ((round 0 (+ round 1))) :while (< round count)
+      (unless (== (curve:evaluate-batch! handle controls dimension parameters order spans rows out) basis:BasisSuccess)
+        (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))

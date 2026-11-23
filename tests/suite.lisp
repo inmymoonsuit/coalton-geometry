@@ -5,6 +5,7 @@
   (allocation-control-test)
   (run-representation-tests)
   (run-spline-basis-tests)
+  (run-spline-curve-tests)
   (run-aliasing-tests)
   (run-scale-sweep-tests)
   (format t "TESTS-PASS~%"))

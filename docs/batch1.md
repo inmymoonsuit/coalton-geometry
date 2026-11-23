@@ -2,7 +2,8 @@
 
 State: completed 2026-11-23; both complete checks pass at safety 1 and safety 0 on
 Windows x86-64, SBCL 2.6.10 and the pinned Coalton compiler. The library's first consumer
-accepted the contract as built on 2026-11-23; its review of the code is still to come.
+accepted the contract as built on 2026-11-23, and its own review of the code, with tests
+this library's author did not see, found no defect: [below](#the-consumers-review).
 
 ## What was built
 
@@ -186,6 +187,27 @@ The consumer accepted them all, and checked the derivation of the first by hand.
    jumps: the accepted rule read for order zero.
 6. **The cost of derivatives is quadratic in the order**, not linear as the accepted text
    said.
+
+## The consumer's review
+
+Held back from the author and run on the commit as pushed, 2026-11-23. Its figures, as it
+reported them:
+
+- 57,053 checks against exact rational arithmetic, none failed, and no compiler warning.
+- Its own cubics at every knot and on either side; 120 random knot vectors of degrees 1 to
+  5 with multiplicities, spacing over 40 binades, clamped and not; knots near the bottom
+  of the range and parameters a subnormal distance from a knot; a batch against its single
+  calls bit for bit; the scale law from 2^-400 to 2^400; every refusal and both aliasing
+  errors.
+- Every value and derivative held to the contract's bound, with `S` and `U` computed from
+  the contract's formulas. Its worst errors, as fractions of the bound: 0.41 for a value,
+  0.40, 0.36 and 0.31 for the first three derivatives. Those are worse cases than this
+  record's own 0.27 and 0.22, found by inputs the author did not choose, and still inside.
+- Each refusal as too large to hold checked to have an exact `S` at or above the largest
+  double.
+- Five plants of its own, all caught. Forming the second weight as one less the first put
+  an error 1.5 × 10^14 times over the bound near the end of a domain: the rule the
+  contract's bound turns on is load-bearing, by a second measurement.
 
 ## What went differently from the order of work
 

@@ -152,6 +152,10 @@ function of the exponent that returns the outputs. The run's source is kept, to 
         (push (aref blocks (+ (* block per) (* row width) r)) found)))
     (coerce (nreverse found) '(simple-array double-float (*)))))
 
+(defun sweep-curve-controls ()
+  "Six control points of the plane for the knots above, of mixed sign."
+  (doubles 1d0 -2d0 3d0 0.5d0 -1.5d0 4d0 2d0 2d0 -3d0 1d0 0.25d0 -0.75d0))
+
 (defun sweep-roster ()
   "The entries."
   (list
@@ -205,7 +209,50 @@ function of the exponent that returns the outputs. The run's source is kept, to 
                (sweep-out "spans" spans 0)
                (sweep-out "batch values" (sweep-rows batch 4 0) 0)
                (sweep-out "batch first derivatives" (sweep-rows batch 4 1) -1)
-               (sweep-out "batch second derivatives" (sweep-rows batch 4 2) -2)))))))
+               (sweep-out "batch second derivatives" (sweep-rows batch 4 2) -2)))))
+
+   ;; Every coordinate of a curve moves with its control points. At 2^-1020 some products of a
+   ;; weight and a coordinate are below the normal range while their sum is not, and the sum
+   ;; comes back within a few last places; at 2^1020 a second derivative is too large to hold.
+   (sweep-entry "a curve, its control points scaled"
+       (curve:evaluate! curve:evaluate-batch!) 1d-15
+       ((-1020 -1020 :close) (-1000 1000 :exact) (1020 1020 :refused))
+     (lambda (k)
+       (let* ((handle (basis:make-basis 3 (sweep-basis-knots 0) 2))
+              (controls (sweep-array (sweep-curve-controls) k))
+              (parameters (doubles 1.5d0 2d0 3.75d0 5d0))
+              (rows (make-array 12 :element-type 'double-float :initial-element 0d0))
+              (out (make-array 6 :element-type 'double-float :initial-element 0d0))
+              (spans (make-array 4 :element-type '(unsigned-byte 62) :initial-element 0))
+              (batch-rows (make-array 48 :element-type 'double-float :initial-element 0d0))
+              (batch-out (make-array 24 :element-type 'double-float :initial-element 0d0)))
+         (sweep-need (curve:evaluate! handle controls 2 3.75d0 2 rows out) basis:BasisSuccess)
+         (sweep-need (curve:evaluate-batch! handle controls 2 parameters 2 spans batch-rows batch-out) basis:BasisSuccess)
+         (list (sweep-out "rows" rows 0) (sweep-out "the point and its derivatives" out 1)
+               (sweep-out "batch rows" batch-rows 0) (sweep-out "batch points and derivatives" batch-out 1)))))
+
+   ;; The point does not move with the knots; a derivative of order m moves by the scale to the
+   ;; power -m, as the basis's do, and is refused or lost at the same ends of the range.
+   (sweep-entry "a curve, its knots and parameters scaled"
+       (curve:evaluate! curve:evaluate-batch!) 1d-15
+       ((-1020 -510 :refused) (-400 400 :exact) (510 1020 :lost))
+     (lambda (k)
+       (let* ((handle (basis:make-basis 3 (sweep-basis-knots k) 2))
+              (controls (sweep-curve-controls))
+              (parameters (sweep-array (doubles 1.5d0 2d0 3.75d0 5d0) k))
+              (rows (make-array 12 :element-type 'double-float :initial-element 0d0))
+              (out (make-array 6 :element-type 'double-float :initial-element 0d0))
+              (spans (make-array 4 :element-type '(unsigned-byte 62) :initial-element 0))
+              (batch-rows (make-array 48 :element-type 'double-float :initial-element 0d0))
+              (batch-out (make-array 24 :element-type 'double-float :initial-element 0d0)))
+         (sweep-need (curve:evaluate! handle controls 2 (aref parameters 2) 2 rows out) basis:BasisSuccess)
+         (sweep-need (curve:evaluate-batch! handle controls 2 parameters 2 spans batch-rows batch-out) basis:BasisSuccess)
+         (list (sweep-out "the point" (subseq out 0 2) 0)
+               (sweep-out "the first derivative" (subseq out 2 4) -1)
+               (sweep-out "the second derivative" (subseq out 4 6) -2)
+               (sweep-out "batch points" (sweep-rows batch-out 2 0) 0)
+               (sweep-out "batch first derivatives" (sweep-rows batch-out 2 1) -1)
+               (sweep-out "batch second derivatives" (sweep-rows batch-out 2 2) -2)))))))
 
 ;;; ---- The roster against the sources, and its run -------------------------------------------
 
