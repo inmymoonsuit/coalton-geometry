@@ -93,9 +93,11 @@ any other: it succeeds and writes nothing.
 
 The order and the sizes are asked before any parameter is looked at.
 
-*As built.* **Too large to hold** means that `S` of [the error bound](#the-error-bound)
-reaches the largest double: the derivative is formed as a difference of terms of that size,
-and a term that overflows is refused whether or not the difference itself would have fitted.
+**Too large to hold** is judged on the derivative rows, not on a lower-degree quotient
+that will be divided by a wide knot interval later. If the ordinary recurrence overflows,
+it is retried with a separate signed binary exponent. Normalization is by powers of two;
+the significands follow the same divisions, differences and products, and only the
+requested rows are narrowed back to doubles. The basis owns the extra row of exponents.
 A single evaluation is computed in the handle's workspace and copied out only when all of
 it is finite, so it writes nothing on this refusal either.
 
@@ -249,8 +251,8 @@ caller's arithmetic. The basis is evaluated at the double it is given.
 1. **An intermediate out of range.** Differences of doubles do not underflow. A difference
    of knots across the whole vector is checked finite when the handle is made, so no later
    difference can overflow. Quotients lie in `[0, 1]`. Only a derivative's division by a
-   small knot difference can leave the range, and its result is then itself out of range
-   and refused.
+   small knot difference or its subsequent scaling can leave the range. A lower-degree
+   intermediate can overflow even though a requested row fits; the retry above handles it.
 2. **Two arguments one array.** `parameters` and `out` are both arrays of doubles. A block
    for each parameter is longer than one parameter, so they have one length only when
    there is no parameter; they are refused if they are one array. *As built:* the handle's

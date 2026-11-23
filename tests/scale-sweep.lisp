@@ -138,7 +138,7 @@ it: the output and the number, or the refusal's own words."
 (defmacro sweep-entry (name covers tolerance declared run)
   "An entry: its name, the calls it answers for, the tolerance of :close, the declared ranges, and the run, a
 function of the exponent that returns the outputs. The run's source is kept, to check the calls against."
-  `(list ,name ',covers ,tolerance ',declared ,run ',run))
+  `(list ,name ',covers ,tolerance ,declared ,run ',run))
 
 (defun sweep-basis-knots (k)
   "A clamped cubic knot vector with two interior knots, none of them zero, so that every knot moves with the scale."
@@ -156,9 +156,8 @@ function of the exponent that returns the outputs. The run's source is kept, to 
   "Six control points of the plane for the knots above, of mixed sign."
   (doubles 1d0 -2d0 3d0 0.5d0 -1.5d0 4d0 2d0 2d0 -3d0 1d0 0.25d0 -0.75d0))
 
-(defun sweep-search (call knots controls points step foot-power distance-power residual-power speed-power)
-  "One search, by CALL, of a cubic of the plane for three points, and its outputs with the powers they move by. A point
-left unresolved is a refusal of the run: no parameter was returned for it."
+(defun sweep-search (call index knots controls points step foot-power distance-power residual-power speed-power)
+  "Run the whole batch, but classify point INDEX independently of its neighbours."
   (let* ((search (nearest:make-search (basis:make-basis 3 knots 2) 2 60 4000))
          (feet (make-array 3 :element-type 'double-float :initial-element 0d0))
          (reports (make-array 3 :element-type '(unsigned-byte 62) :initial-element 0))
@@ -166,21 +165,30 @@ left unresolved is a refusal of the run: no parameter was returned for it."
          (status (funcall call search controls points (doubles) step 0d0 feet reports measures)))
     (unless (eq status (coalton:coalton nearest:SearchSuccess))
       (error "nearest! returned ~A" status))
-    (when (find 4 reports)
-      (error "nearest! left a point unresolved: ~S" reports))
-    (flet ((column (k) (coerce (loop :for i :from 0 :below 3 :collect (aref measures (+ (* 4 i) k)))
-                               '(simple-array double-float (*)))))
-      (list (sweep-out "parameters" feet foot-power) (sweep-out "reports" reports 0)
-            (sweep-out "distances" (column 0) distance-power)
-            (sweep-out "residuals" (column 1) residual-power)
-            (sweep-out "speeds" (column 3) speed-power)))))
+    (when (= nearest:report-unresolved (aref reports index))
+      (error "nearest! left point ~D unresolved" index))
+    (flet ((measure (k) (aref measures (+ (* 4 index) k))))
+      (list (sweep-out "parameter" (aref feet index) foot-power) (sweep-out "report" (aref reports index) 0)
+            (sweep-out "distance" (measure 0) distance-power) (sweep-out "residual" (measure 1) residual-power)
+            (sweep-out "speed" (measure 3) speed-power)
+            (sweep-out "finite residual error" (measure 2) 0 :kind :within :bound most-positive-double-float)))))
+
+(defun search-sweep-ranges (index knots-p)
+  ;; The interior foot and the two endpoints have different representable
+  ;; residuals at the extremes. These ranges were measured per point.
+  (cond
+    ((and knots-p (zerop index))
+     '((-1020 -1000 :no-input) (-800 -400 :limit) (-300 300 :exact) (400 800 :limit) (1000 1020 :refused)))
+    (knots-p '((-1020 -1000 :no-input) (-800 -400 :limit) (-300 300 :exact) (400 1020 :limit)))
+    ((zerop index) '((-1020 -600 :refused) (-520 -510 :lost) (-400 400 :exact) (510 520 :limit) (600 1020 :refused)))
+    (t '((-1020 -600 :refused) (-520 400 :exact) (510 510 :limit) (512 1020 :refused)))))
 
 (defun sweep-roster ()
   "The entries."
-  (list
+  (append (list
    (sweep-entry "a basis and what it reads back, the knots scaled"
        (basis:make-basis basis:domain-start basis:domain-end basis:knots) 0d0
-       ((-1020 1020 :exact))
+       '((-1020 1020 :exact))
      (lambda (k)
        (let ((handle (basis:make-basis 3 (sweep-basis-knots k) 2)))
          (list (sweep-out "domain-start" (basis:domain-start handle) 1)
@@ -190,7 +198,7 @@ left unresolved is a refusal of the run: no parameter was returned for it."
    ;; The values and the spans do not move with the scale, anywhere in the format.
    (sweep-entry "values of a basis, the knots and the parameters scaled"
        (basis:evaluate! basis:evaluate-batch!) 0d0
-       ((-1020 1020 :exact))
+       '((-1020 1020 :exact))
      (lambda (k)
        (let* ((handle (basis:make-basis 3 (sweep-basis-knots k) 2))
               (parameters (sweep-array (doubles 1.5d0 2d0 3.75d0 5d0) k))
@@ -213,7 +221,7 @@ left unresolved is a refusal of the run: no parameter was returned for it."
    ;; those two runs are :wrong.
    (sweep-entry "derivatives of a basis, the knots and the parameters scaled"
        (basis:evaluate! basis:evaluate-batch!) 1d-15
-       ((-1020 -512 :refused) (-510 400 :exact) (510 1020 :lost))
+       '((-1020 -512 :refused) (-510 400 :exact) (510 1020 :lost))
      (lambda (k)
        (let* ((handle (basis:make-basis 3 (sweep-basis-knots k) 2))
               (parameters (sweep-array (doubles 1.5d0 2d0 3.75d0 5d0) k))
@@ -235,7 +243,7 @@ left unresolved is a refusal of the run: no parameter was returned for it."
    ;; comes back within a few last places; at 2^1020 a second derivative is too large to hold.
    (sweep-entry "a curve, its control points scaled"
        (curve:evaluate! curve:evaluate-batch!) 1d-15
-       ((-1020 -1020 :close) (-1000 1000 :exact) (1020 1020 :refused))
+       '((-1020 -1020 :close) (-1000 1000 :exact) (1020 1020 :refused))
      (lambda (k)
        (let* ((handle (basis:make-basis 3 (sweep-basis-knots 0) 2))
               (controls (sweep-array (sweep-curve-controls) k))
@@ -254,7 +262,7 @@ left unresolved is a refusal of the run: no parameter was returned for it."
    ;; power -m, as the basis's do, and is refused or lost at the same ends of the range.
    (sweep-entry "a curve, its knots and parameters scaled"
        (curve:evaluate! curve:evaluate-batch!) 1d-15
-       ((-1020 -510 :refused) (-400 400 :exact) (510 1020 :lost))
+       '((-1020 -510 :refused) (-400 400 :exact) (510 1020 :lost))
      (lambda (k)
        (let* ((handle (basis:make-basis 3 (sweep-basis-knots k) 2))
               (controls (sweep-curve-controls))
@@ -271,34 +279,24 @@ left unresolved is a refusal of the run: no parameter was returned for it."
                (sweep-out "the second derivative" (subseq out 4 6) -2)
                (sweep-out "batch points" (sweep-rows batch-out 2 0) 0)
                (sweep-out "batch first derivatives" (sweep-rows batch-out 2 1) -1)
-               (sweep-out "batch second derivatives" (sweep-rows batch-out 2 2) -2)))))
+               (sweep-out "batch second derivatives" (sweep-rows batch-out 2 2) -2))))))
 
-   ;; A parameter is promised to within the step, 10^-12 here, and not bit for bit: where the
-   ;; search stops depends on error bounds that have terms which do not move with the scale. So
-   ;; these two entries are compared to 10^-10. A point left unresolved is a refusal of the run.
-   ;; The residual is a product of two lengths, so it leaves the range at half the exponent a
-   ;; length does: from 2^512 the search can show nothing and says so, and at 2^510 it already
-   ;; cannot although every answer could still be held, which is its limit.
-   (sweep-entry "a search, the curve and the points scaled"
-       (nearest:nearest!) 1d-10
-       ((-1020 -600 :refused) (-520 -510 :lost) (-400 400 :exact) (510 510 :limit) (512 1020 :refused))
+   (loop :for i :below 3 :append
+    (let ((index i))
+     (list
+     (sweep-entry (format nil "search point ~D, the coordinates scaled" index)
+       (nearest:nearest!) 1d-10 (search-sweep-ranges index nil)
      (lambda (k)
-       (sweep-search #'nearest:nearest! (doubles 0d0 0d0 0d0 0d0 1d0 1d0 1d0 1d0)
+       (sweep-search #'nearest:nearest! index (doubles 0d0 0d0 0d0 0d0 1d0 1d0 1d0 1d0)
                      (sweep-array (doubles 0.5d0 0.25d0 0.75d0 3d0 2d0 3.5d0 2.5d0 0.5d0) k)
                      (sweep-array (doubles 1.5d0 4.5d0 0.25d0 -1d0 3d0 -0.5d0) k) 1d-12 0 1 2 1)))
 
-   ;; With the knots scaled the derivatives move by the scale to the powers -1, -2 and -3, and
-   ;; the bounds are built from all three. Beyond 2^300 either way what underflow could have
-   ;; lost is what the bounds consist of, nothing can be shown, and every point is unresolved:
-   ;; the range of scales the contract speaks of. At 2^-1000 the step itself is no input.
-   (sweep-entry "a search, the knots scaled"
-       (nearest:nearest!) 1d-10
-       ((-1020 -1000 :no-input) (-800 -510 :limit) (-400 -400 :close) (-300 300 :exact) (400 800 :limit)
-        (1000 1020 :refused))
+     (sweep-entry (format nil "search point ~D, the knots scaled" index)
+       (nearest:nearest!) 1d-10 (search-sweep-ranges index t)
      (lambda (k)
-       (sweep-search #'nearest:nearest! (sweep-array (doubles 1d0 1d0 1d0 1d0 2d0 2d0 2d0 2d0) k)
+       (sweep-search #'nearest:nearest! index (sweep-array (doubles 1d0 1d0 1d0 1d0 2d0 2d0 2d0 2d0) k)
                      (doubles 0.5d0 0.25d0 0.75d0 3d0 2d0 3.5d0 2.5d0 0.5d0)
-                     (doubles 1.5d0 4.5d0 0.25d0 -1d0 3d0 -0.5d0) (sweep-number 1d-12 k) 1 0 -1 -1)))))
+                     (doubles 1.5d0 4.5d0 0.25d0 -1d0 3d0 -0.5d0) (sweep-number 1d-12 k) 1 0 -1 -1))))))))
 
 ;;; ---- The roster against the sources, and its run -------------------------------------------
 
@@ -358,7 +356,7 @@ left unresolved is a refusal of the run: no parameter was returned for it."
     ;; Control: an entry that answers for a call its run does not make is refused.
     (assert (handler-case
                 (progn (sweep-check-entry
-                        (sweep-entry "a control" (sweep-number sweep-array) 1d-15 ((-1020 1020 :exact))
+                        (sweep-entry "a control" (sweep-number sweep-array) 1d-15 '((-1020 1020 :exact))
                           (lambda (k) (list (sweep-out "a number" (sweep-number 3d0 k) 1)))))
                        nil)
               (error () t))

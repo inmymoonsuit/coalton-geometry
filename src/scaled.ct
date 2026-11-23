@@ -1,0 +1,58 @@
+(cl:defpackage #:coalton-geometry/internal/scaled
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:math #:coalton/math)))
+(cl:in-package #:coalton-geometry/internal/scaled)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+(coalton-toplevel
+  (inline)
+  (declare finite? (F64 -> Boolean))
+  (define (finite? x)
+    (inline (math:finite? x)))
+
+  ;; Only the overflow retries need a significand and a separate binary exponent.
+  ;; DECODE-FLOAT and SCALE-FLOAT box on the supported SBCL. Read/write only
+  ;; the eleven exponent bits; bring subnormals into range by an exact shift.
+  (inline)
+  (declare exponent-bits (F64 -> IFix))
+  (define (exponent-bits x)
+    (lisp (-> IFix) (x) (cl:ldb (cl:byte 11 20) (sb-kernel:double-float-high-bits x))))
+
+  (inline)
+  (declare with-exponent (F64 * IFix -> F64))
+  (define (with-exponent x bits)
+    (lisp (-> F64) (x bits)
+      (sb-kernel:make-double-float (cl:dpb bits (cl:byte 11 20) (sb-kernel:double-float-high-bits x))
+                                   (sb-kernel:double-float-low-bits x))))
+
+  (inline)
+  (declare split-binary (F64 -> F64 * IFix))
+  (define (split-binary x)
+    (let bits = (exponent-bits x))
+    (cond
+      ((nonzero? bits) (values (with-exponent x 1022) (- bits 1022)))
+      ((zero? x) (values x 0))
+      (True
+       (let normal = (* x #.(cl:scale-float 1d0 54)))
+       (values (with-exponent normal 1022) (- (exponent-bits normal) 1076)))))
+
+  (inline)
+  (declare scale-binary (F64 * IFix -> F64))
+  (define (scale-binary x shift)
+    (when (or (zero? x) (zero? shift))
+      (return x))
+    (let (values fraction previous) = (split-binary x))
+    (let bits = (+ (+ previous shift) 1022))
+    (cond
+      ((> bits 2046) (if (< x 0.0d0) (negate math:infinity) math:infinity))
+      ((> bits 0) (with-exponent fraction bits))
+      ((< bits -52) (* fraction 0.0d0))
+      ;; Only this last multiplication rounds a subnormal result.
+      (True (* (with-exponent fraction (+ bits 1022)) #.cl:least-positive-normalized-double-float))))
+
+  (inline)
+  (declare add-binary (F64 * IFix * F64 * IFix -> F64 * IFix))
+  (define (add-binary x ex y ey)
+    (let e = (cond ((zero? x) ey) ((zero? y) ex) (True (max ex ey))))
+    (let (values m shift) = (split-binary (+ (scale-binary x (- ex e)) (scale-binary y (- ey e)))))
+    (values m (+ e shift))))

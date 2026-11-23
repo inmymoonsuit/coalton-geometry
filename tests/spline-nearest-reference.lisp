@@ -35,6 +35,14 @@
 (defun poly-derivative (p)
   (poly-trim (loop :for c :in (rest p) :for k :from 1 :collect (* k c))))
 
+(defun poly-side-sign (p x side)
+  "The sign immediately to SIDE of X, without stepping across another root."
+  (loop :for q := p :then (poly-derivative q)
+        :for k :from 0 :while q
+        :for v := (poly-value q x)
+        :unless (zerop v) :return (if (and (eq side :left) (oddp k)) (- (signum v)) (signum v))
+        :finally (return 0)))
+
 (defun poly-remainder (p q)
   "The remainder of P on division by Q, which is not zero."
   (let ((r (poly-trim p)) (dq (1- (length q))) (lead (car (last q))))
@@ -190,21 +198,17 @@ equally far from a whole piece of the curve, and no list of least points describ
                            ;; a knot the two sides are judged on their own spans, so a knot is taken on the
                            ;; span to its right and the sign before it from the span to its left, below.
                            (unless (or (= middle low) (= middle high))
-                             (let ((before (poly-value residual (if (= a b) (- a (* width (- high low))) a)))
-                                   (after (poly-value residual (if (= a b) (+ b (* width (- high low))) b))))
+                             (let ((before (poly-side-sign residual a (if (= a b) :left :right)))
+                                   (after (poly-side-sign residual b (if (= a b) :right :left))))
                                (when (and (minusp before) (plusp after))
                                  (push (list middle (squared span middle) :foot) found))))))
                        ;; The ends of the domain, and a knot where the residual passes through zero.
-                       (when (and (= low start) (not (minusp (poly-value residual low))))
-                         (when (or (plusp (poly-value residual low))
-                                   (plusp (poly-value residual (+ low (* width (- high low))))))
-                           (push (list low (squared span low) :start) found)))
-                       (when (and (= high end) (not (plusp (poly-value residual high))))
-                         (when (or (minusp (poly-value residual high))
-                                   (minusp (poly-value residual (- high (* width (- high low))))))
-                           (push (list high (squared span high) :end) found)))
+                       (when (and (= low start) (plusp (poly-side-sign residual low :right)))
+                         (push (list low (squared span low) :start) found))
+                       (when (and (= high end) (minusp (poly-side-sign residual high :left)))
+                         (push (list high (squared span high) :end) found))
                        (when (and (< high end) (zerop (poly-value residual high))
-                                  (minusp (poly-value residual (- high (* width (- high low))))))
+                                  (minusp (poly-side-sign residual high :left)))
                          ;; A foot exactly at an interior knot: least if the residual rises out of it on
                          ;; the next span too. The curve is smooth there, so the residual is zero from both.
                          (let ((next (loop :for s :from (1+ span) :below n
@@ -216,13 +220,17 @@ equally far from a whole piece of the curve, and no list of least points describ
                                                                                (poly-add curve (list (- (aref point c))))
                                                                                (poly-derivative curve)))))
                                             sum)))
-                             (when (and beyond
-                                        (plusp (poly-value beyond (+ high (* width (- (aref knots (1+ next)) high))))))
+                             (when (plusp (poly-side-sign beyond high :right))
                                (push (list high (squared span high) :foot) found)))))))))
       (values (sort found #'< :key #'first) flat))))
 
 (defun exact-nearest-reference-tests ()
   "The reference itself, where the answer is known."
+  (let* ((w (expt 2 -70)) (e (* 3/2 w))
+         (least (exact-least-points #(0 0 0 1 1 1) 2 (vector 0 (- (/ e 2)) 1) 1 #(0) w)))
+    ;; t((1+e)t-e) vanishes twice. A fixed step of w from the first
+    ;; minimum passes the intervening maximum and gives the wrong sign.
+    (assert (equal (mapcar #'third least) '(:start :foot))))
   ;; Roots: a cubic with three known roots, one of them an endpoint of a halving and one double.
   (flet ((holds (interval root) (and (<= (car interval) root (cdr interval)))))
     (let ((roots (poly-roots (poly-multiply (poly-multiply '(-1/3 1) '(-1/2 1)) '(-7/5 1)) 0 2 (expt 2 -60))))

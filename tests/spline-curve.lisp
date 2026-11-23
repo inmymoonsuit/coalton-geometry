@@ -175,6 +175,15 @@ the degree. Returns the number of parameters."
   "Control points so small that a weight times a coordinate is below the normal range, on ordinary knots: where the
 underflow terms of the bound are what is being checked. The number of results that needed them is printed."
   (let ((record (make-curve-record)) (vectors 0))
+    (let* ((large (expt 2d0 1023)) (handle (basis:make-basis 2 (doubles 0d0 0d0 0d0 1d0 1d0 1d0) 1))
+           (controls (doubles large large large)) (out (basis-sentinel 2)) (rows (basis-sentinel 6))
+           (parameters (doubles 0d0)) (tally (indices 0)))
+      (assert (= 0 (cc:evaluate-code handle controls 1 0d0 1 rows out)))
+      (assert (equalp out (doubles large 0d0)))
+      (fill out 7777d0)
+      (assert (= 0 (cc:batch-code handle controls 1 (doubles 1d0) 1 (indices 0) rows out)))
+      (assert (equalp out (doubles large 0d0)))
+      (assert (zerop (bytes-a-call (lambda (n) (cc:evaluate-loop handle controls 1 parameters 1 rows out tally n)) 20000))))
     (loop :for (degree breaks multiplicities dimension)
             :in '((1 (0 1 2) (2 1 2) 2) (2 (0 1 3 4) (3 1 1 3) 3) (3 (0 1/3 1) (4 1 4) 2) (2 (-2 0 1 5) (1 2 2 3) 1)
                   (3 (0 1 2 3 4 5 6 7) (1 1 1 1 1 1 1 1) 2))
@@ -222,8 +231,13 @@ underflow terms of the bound are what is being checked. The number of results th
           (let ((spoiled (copy-seq controls)))
             (setf (aref spoiled position) bad)
             (refused 2 spoiled 2 0.5d0 2 12 6 "a control point of the span that is not finite" t))))
-      ;; A result too large to hold, from control points that are themselves finite.
+      ;; All equal would be a constant curve. Negating the first control
+      ;; makes the first derivative at 1/2 equal to 3/2 times the largest double.
       (let ((huge (make-array 14 :element-type 'double-float :initial-element most-positive-double-float)))
+        (setf (aref huge 0) (- most-positive-double-float))
+        (assert (> (second (exact-curve-column (map 'vector #'rational knots) 3 3 1/2
+                                               (loop :for j :below 4 :collect (rational (aref huge (* 2 j)))) 1))
+                   (rational most-positive-double-float)))
         (refused 2 huge 2 0.5d0 2 12 6 "a result too large to hold" t)))
     ;; A control point that is not finite and is not of the span does not refuse the call.
     (let ((spoiled (copy-seq controls)) (rows (basis-sentinel 12)) (out (basis-sentinel 6)) (clean (basis-sentinel 6)))

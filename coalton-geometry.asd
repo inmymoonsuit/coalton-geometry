@@ -13,7 +13,8 @@
   ;; A module is added here as a :ct-file once it has a contract and a consumer, and the two
   ;; rosters then read it from the sources.
   :components ((:module "src" :serial t
-                :components ((:module "spline" :serial t
+                :components ((:ct-file "scaled")
+                             (:module "spline" :serial t
                               :components ((:ct-file "basis") (:ct-file "curve") (:ct-file "nearest")))))))
 
 (asdf:defsystem "coalton-geometry/tests"

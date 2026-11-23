@@ -61,9 +61,9 @@ The control points are not held: they are an argument of every call.
   takes them.
 - `points`: `count` points, `dimension` coordinates each.
 - `hints`: either no entry, or `count` parameters, one for each point: a guess, such as
-  the answer of the step before. **A hint can only save work. It never changes the
-  answer**, and a hint outside the domain or far from the answer costs nothing but its own
-  evaluation.
+  the answer of the step before. A hint supplements the same initial upper bound as an
+  unhinted search; it never replaces that bound or consumes interval budget. An
+  out-of-domain hint is ignored. A helpful hint may resolve a budget-limited query.
 - `step`: a tolerance in the units of the parameter, at least zero. A foot is returned
   inside an interval no wider than this that holds it, or as narrow as the arithmetic can
   make it where that is wider.
@@ -88,11 +88,11 @@ One code for each point.
 | `foot` | The nearest point of the curve, at a parameter strictly inside the domain | written |
 | `start`, `end` | The nearest point of the curve is at that end of the domain | written; the parameter is the end exactly |
 | `tied` | A second least point of the distance, apart from the one returned, is within `tie` of being as near, or could not be shown not to be | written, for the nearer of those found |
-| `unresolved` | The work allowed by `depth` or by `budget` ran out before the curve could be shown to hold one answer. A curve that is a single point, or a point at the centre of an arc, ends here; so does a point for which the distance has a greatest value within `tie` of its least, since the tests cannot tell a greatest value from a least point not yet found | not a number, in every entry: no parameter is returned |
+| `unresolved` | The depth, budget, or finite arithmetic could not certify one answer. This includes a potentially winning interval with an unrepresentable measure or an undecidable endpoint sign. | not a number, in every entry: no parameter is returned |
 
-**`start` and `end` are decided by the parameter returned and by nothing else.** The
-report is `foot` exactly when the returned parameter is strictly between the ends of the
-domain. A foot that coincides with an end to the last bit is reported as that end.
+**`start` and `end` require evidence that the endpoint minimizes the distance.** A small
+residual at the end alone is not that evidence. A reported `foot` is strictly interior.
+All four measures of any resolved answer (including `tied`) are finite.
 
 `tied` and `unresolved` are reports and not refusals: the other points of the batch are
 answered.
@@ -183,12 +183,17 @@ For a span, with `P[j]` its control points:
   sum of magnitudes, which bounds what the differences lost. `M1` needs no such term: each
   of its differences is of two numbers the caller gave, so that its rounding, with that of
   the multiplication, the division and the length, is a few units of roundoff relative to
-  `M1` itself, which the device above absorbs.
+  `M1` itself, which the device above absorbs. When the degree times a difference overflows,
+  the quotient is formed first; if the difference itself overflows, halve the two
+  coordinates before subtracting and restore the factor of two afterward. A non-finite
+  component gives an infinite norm bound, never a missing candidate for the maximum.
 - `W1 = 2p / Δ1` and `W2 = 4p(p - 1) / (Δ1 Δ2)`, with `Δ1` the least `knot[j+p] - knot[j]`
   and `Δ2` the least `knot[j+p-1] - knot[j]` over the span's control points. They bound the
   sums of the basis contract's `S` for the first and the second derivative: each step of
   `S` multiplies the sum of the row before it by at most twice the degree reached over the
-  least knot difference, and a row of values sums to one.
+  least knot difference, and a row of values sums to one. For `W2` divide by the longer
+  difference first, then by the shorter one, rather than forming their product. One least
+  positive double covers a subnormal final quotient.
 
 `A` is the largest magnitude of a coordinate of a control point, and `B` of the point `X`.
 
@@ -271,8 +276,15 @@ nearest point of the curve is no farther than that.
      domain;
    - below at the left and above at the right: a foot lies strictly between, and is found
      as the next section says;
-   - otherwise the residual at an end is zero to within its bound, and that end is the
-     candidate; where that is so at both ends, the nearer of them.
+   - at a clamped domain end with ambiguous residual, its sign is also the sign of
+     `(P[end] - X) · (P[j+1] - P[j])`, with the first or last control-point edge in
+     increasing parameter order: the omitted knot factor is positive. Differences are
+     of inputs. `2^-40` times the sum of absolute products covers their relative rounding
+     and that of the dot product in at most 256 dimensions; `2^-1060` covers product
+     underflows. If every product has an exactly zero factor, the residual is exactly
+     zero. An inconclusive domain-end sign leaves the interval unresolved unless the
+     other end already excludes it. At an interior subdivision boundary a residual
+     within its error retains the existing approximate-foot convention.
 4. **Otherwise halved.** An interval that has been halved `depth` times is kept as
    unresolved, with the lower bound of the distance over it. Once `budget` intervals have
    been looked at for a point, every interval not yet looked at is unresolved, with no
@@ -323,6 +335,12 @@ curvature `H` at the candidate, whose least value is lower by the squared residu
 
     floor  =  √( (d̂ - e_d)² - (|ĝ| + e_g)² / H ),  or zero if that is negative
 
+The implementation does not square dimensioned distances. For positive lower distance
+`L` it computes an upper bound `q` on `(|ĝ| + e_g)/(√H L)` and uses
+`L √((1-q)(1+q))` for `q < 1`, rounding conservatively, or zero otherwise. Overflow
+cannot turn a finite candidate's lower bound into infinity. Non-finite measures,
+uncertainties, or a non-finite convexity gain are not sign or convexity certificates.
+
 *Found by the tests.* The derivation the consumer checked compared `d̂ - e_d` of one
 candidate with another's distance. A parameter returned within `step` of a foot is that
 far from it along the curve, and on a curve that crosses a point twice the two computed
@@ -344,8 +362,7 @@ its one least point as a candidate or showed it not to be one; or is unresolved 
 reported. So the nearest point is among the candidates, and any other least point within
 `tie` of it is a candidate too or lies in an interval that is reported.
 
-**A hint** is evaluated first and only lowers `U`. Where no hint is given the middle of
-every span is evaluated first, for the same purpose. `U` enters test 1 alone, and what
+**A hint** can only lower `U` after the middles of all spans have seeded it. `U` enters test 1 alone, and what
 test 1 sets aside with any `U` that is truly an upper bound holds nothing the promises
 speak of.
 
@@ -367,10 +384,15 @@ point whose report is `foot`:
   `-(N[j](t) C'(t) + N'[j](t) (C(t) - X)) / h`.
 
 Here `h = C'(t) · C'(t) + (C(t) - X) · C''(t)`, the derivative of the residual along the
-curve. For a report of `start` or `end` the parameter does not move and both are zero.
-Where the computed `h` is within its own error bound of zero, the point at a centre of
-curvature, the derivative does not exist: that point's entries are not written and an
-output of this call says so. That bound is `2 ε1 |Ĉ'|₁ + D ε1² + e_w`, with the rounding
+curve. At a **strictly active** endpoint the parameter is locally constant and both
+derivatives are zero. An endpoint report alone does not prove strict activity: for
+`C(t)=t` on `[0,1]`, the projection of `x` is `clamp(x,0,1)`, which has no derivative
+at 0 or 1. At an endpoint transition, or at an interior knot where only one derivative
+is continuous and the two one-sided implicit Jacobians are not shown to agree, the
+planned call must report **derivative unavailable**, not write zeros or choose a side.
+Where `h` is within its error bound of zero, the implicit-function formula likewise
+cannot certify a derivative; this does not by itself prove nonexistence. No derivative
+entries are written for these points. The bound is `2 ε1 |Ĉ'|₁ + D ε1² + e_w`, with the rounding
 of forming `h`. `h` can be well away from zero where the speed is nearly zero; the speed
 among the measures is what tells a caller that.
 
@@ -399,12 +421,16 @@ An output that is one of the call's inputs, or another of its outputs, is the ty
 
 ## Cost
 
-Not measured. In count: the control points of each span are differenced once a call. For
-each point, one evaluation of the curve for the hint, or one for each span where there is
-none; then one for each span to set it aside or not; then, for each interval that
+For a search that can visit intervals, the control points of each span are differenced once a call. For
+each point, one value evaluation per span plus at most one for a hint; then one for each
+span to set it aside or not; then, for each interval that
 survives, a few halvings, two evaluations at its ends, and a Newton iteration of a handful
-of steps with two more to close the bracket. Every evaluation is to the second order. A
-point near a curve that does not fold back toward it costs a few tens of evaluations.
+of steps with two more to close the bracket. Endpoint probes use only the first derivative.
+Empty and zero-budget batches still validate all inputs but build no span bounds and
+evaluate no curve. On one local Windows x86-64 SBCL release build at safety 1, an empty
+2D batch on 128 cubic spans took about 20 µs before this change and 0.19 µs afterward
+(median of five runs of 100,000 warmed calls afterward). This is not a timing of a
+nonempty search or a portable performance guarantee.
 
 ## Where the method is read
 
