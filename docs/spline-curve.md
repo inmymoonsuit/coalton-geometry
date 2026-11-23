@@ -58,12 +58,14 @@ of `(order + 1)(p + 1)` into `rows`, and `count` blocks of `(order + 1) × dimen
 of the first parameter that could not be evaluated, as after the basis module's own batch.
 A batch is its single calls, bit for bit.
 
-*As built.* **The position is the basis's to report, and it reports one only where its own
-batch ran.** After a batch that a parameter caused to refuse it is that parameter's
-position, and after a success it is the number of parameters. A refusal for a control
-point or a result is not a parameter's: the basis's batch succeeded, and the position is
-the number of parameters. A refusal the curve module decides before it calls the basis,
-for an order or a size of its own, leaves the position as the call before left it.
+*As built.* **`refused-index` is meaningful only after a refusal that the basis's own batch
+made**: `BasisOutsideDomain`, `BasisDerivativeUndefined`, or `BasisNonFinite` for a
+parameter or a basis derivative. It is then the position of the first such parameter. After
+a success, and after a refusal for a control point or a result, which is no parameter's
+doing, it is the number of parameters. **After a refusal the curve module decides for
+itself, `BasisBadOrder` or `BasisBadSize`, it is unspecified and must not be read**: the
+module has no handle to keep a position in, and the value there belongs to an earlier
+call.
 
 ## Outcomes
 
@@ -222,3 +224,6 @@ Its answers to the draft's five questions, the same day, with its signature.
 
 It also checked the count of the bound, and asked that the underflow terms be written out,
 which they now are.
+
+It accepted the three points marked *as built* the same day, and asked for the wording of
+the one about `refused-index`, which is as it stands above.
