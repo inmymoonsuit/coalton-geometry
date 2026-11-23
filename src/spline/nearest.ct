@@ -605,10 +605,10 @@
                                    curvature)
                       True low high))
          (True (loosen! num 0.0d0))))
-      ;; An ambiguous domain boundary cannot certify an endpoint. Interior
-      ;; subdivision boundaries can still represent a foot to its residual bound.
-      ((or (and (== low start) (== left-sign Uncertain)) (and (== high end) (== right-sign Uncertain)))
-       (loosen! num (least-floor (arr:aref num n-d) (arr:aref num n-ed) g-hi eg-hi curvature)))
+      ;; The residual at an end of the interval is zero to within its bound, and that end is the
+      ;; candidate; at both, the nearer. An end of the domain is no exception: the least point
+      ;; is within (|g| + e_g) / curvature of it, and the residual and its bound are returned,
+      ;; so a caller can tell such an end from one the distance strictly rises from.
       ((and (== left-sign Uncertain) (or (/= right-sign Uncertain) (<= d-lo (arr:aref num n-d))))
        (candidate! store low d-lo ed-lo (least-floor d-lo ed-lo g-lo eg-lo curvature) True low high))
       (True

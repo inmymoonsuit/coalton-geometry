@@ -6,7 +6,7 @@
 [B-spline curves](docs/spline-curve.md) in batch 2, with their derivatives, and
 [the nearest parameter to a point](docs/spline-nearest.md) in batch 3. The records of
 [batch 1](docs/batch1.md), [batch 2](docs/batch2.md) and [batch 3](docs/batch3.md) have
-what was measured. The
+what was measured, and [batch 3a](docs/batch3a.md) what an outside audit of the three found. The
 library's first consumer has reviewed the code of each with tests of its own and found no
 defect. [The batch plan](docs/plan.md)
 has the order of what follows. That consumer has reviewed batch 3 too and found no

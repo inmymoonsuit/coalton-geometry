@@ -2,15 +2,18 @@
 
 Changes a caller can meet.
 
-## Unreleased
+## 0.3.1 — 2026-11-23
 
 `nearest!` no longer certifies a wrong endpoint or hides an exact tie when a residual
-or squared distance overflows. An ambiguous endpoint may be `unresolved`; a clamped
-endpoint also has a tighter sign test. Poor hints no longer displace the unhinted
+or squared distance overflows. A clamped endpoint also has a tighter sign test. An end
+whose residual is zero to within its bound is still reported `start` or `end`, as before;
+the contract now says what such a report means and how the residual and its bound tell it
+from an end the distance strictly rises from. Poor hints no longer displace the unhinted
 search's starting bounds. Span bounds are not built for empty or zero-budget batches.
 The basis and curve evaluators retry overflowing derivative intermediates with a
 separate exponent instead of refusing merely because an intermediate did not fit.
 The public signatures and the refusal/write guarantees are unchanged.
+[Batch 3a's record](docs/batch3a.md) has each finding and what was measured.
 
 ## 0.3.0 — 2026-11-23
 

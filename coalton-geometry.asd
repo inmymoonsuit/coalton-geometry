@@ -1,6 +1,6 @@
 (asdf:defsystem "coalton-geometry"
   :description "A general-purpose geometry library in Coalton: B-spline basis functions and curves with their derivatives, and the nearest parameter of a curve to a point. See ROADMAP.md for what follows."
-  :version "0.3.0"
+  :version "0.3.1"
   :license "MIT"
   :defsystem-depends-on ("coalton-asdf")
   :depends-on ("coalton")

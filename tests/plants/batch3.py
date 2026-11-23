@@ -16,6 +16,7 @@ already set aside.
 SOURCE = "src/spline/nearest.ct"
 
 PASS_MARKS = ("SPLINE-CURVE-PASS", "SPLINE-NEAREST-REFERENCE-PASS", "SPLINE-NEAREST-REFUSALS-PASS",
+              "SPLINE-NEAREST-ENDS-PASS",
               "SPLINE-NEAREST-KNOWN-PASS", "SPLINE-NEAREST-PASS", "SPLINE-NEAREST-BATCH-PASS",
               "ALIASING-ROSTER-PASS", "SCALE-SWEEP-PASS", "CHECK-PASS safety=1")
 
@@ -61,6 +62,11 @@ PLANTS = [
     (SOURCE, "an interior knot allowed as often as the degree, where the tangent can turn",
      "      (when (and (== (arr:aref knots i) (arr:aref knots (+ i (- p 1))))",
      "      (when (and (== (arr:aref knots i) (arr:aref knots (min (- count 1) (+ i p))))"),
+    (SOURCE, "an end of the domain whose residual is within its bound left unresolved",
+     "      ((and (== left-sign Uncertain) (or (/= right-sign Uncertain) (<= d-lo (arr:aref num n-d))))",
+     "      ((or (and (== low start) (== left-sign Uncertain)) (and (== high end) (== right-sign Uncertain)))\n"
+     "       (loosen! num 0.0d0))\n"
+     "      ((and (== left-sign Uncertain) (or (/= right-sign Uncertain) (<= d-lo (arr:aref num n-d))))"),
     (SOURCE, "a finite candidate's distance squared before scaling",
      "(let floor = (* (* low (math:sqrt (* (- 1.0d0 q) (+ 1.0d0 q)))) kept-down))",
      "(let floor = (* (* (math:sqrt (* low low)) (math:sqrt (* (- 1.0d0 q) (+ 1.0d0 q)))) kept-down))"),

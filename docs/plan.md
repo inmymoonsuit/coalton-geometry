@@ -2,7 +2,7 @@
 
 State: reviewed and accepted by the library's first consumer on 2026-11-22. **Batches 1,
 2 and 3 are built** (records: [batch 1](batch1.md), [batch 2](batch2.md),
-[batch 3](batch3.md)); nothing else is. [The roadmap](../ROADMAP.md) has the
+[batch 3](batch3.md), and [an outside audit of the three](batch3a.md)); nothing else is. [The roadmap](../ROADMAP.md) has the
 consumer's ranking this plan follows; [the design notes](design.md) have the decisions
 every batch rests on.
 

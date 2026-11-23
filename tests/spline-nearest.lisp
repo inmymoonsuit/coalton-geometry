@@ -431,9 +431,64 @@ the hint, and with a hint that is wrong. Returns the number of curves."
         (setf (aref controls 0) sb-ext:double-float-positive-infinity)
         (assert (= 3 (nc:nearest-code s controls (doubles) (doubles) 0d0 0d0 (doubles) (indices) (doubles))))))))
 
+(defun nearest-end-tests ()
+  "An end of the domain, by how it is reached. Where the residual there is zero to within its bound the end is still
+the answer, and the two measures say so; where the distance strictly rises from the end the residual is beyond its
+bound; and a foot a little inside is a foot. Each answer is held to the exact reference as every other is."
+  (let ((record (make-nearest-record)) (cases 0))
+    (flet ((answer (label knots degree controls point)
+             (let ((search (nearest:make-search (basis:make-basis degree knots 2) 2 60 4000)))
+               (multiple-value-bind (feet reports measures)
+                   (nearest-run search knots degree 2 controls point 1d-12 0d0 record :label label)
+                 (incf cases)
+                 (list (aref reports 0) (aref feet 0) (aref measures 1) (aref measures 2))))))
+      (flet ((within (label knots degree controls point report parameter)
+               (destructuring-bind (found foot residual bound) (answer label knots degree controls point)
+                 (assert (and (= found report) (= foot parameter) (<= (abs residual) bound)) ()
+                         "~A: wanted report ~D at ~S with a residual within its bound, and got ~D at ~S, ~S and ~S."
+                         label report parameter found foot residual bound)))
+             (strict (label knots degree controls point report parameter)
+               (destructuring-bind (found foot residual bound) (answer label knots degree controls point)
+                 (assert (and (= found report) (= foot parameter)
+                              (if (= report nearest:report-start) (> residual bound) (< residual (- bound))))
+                         () "~A: wanted report ~D at ~S with a residual beyond its bound, and got ~D at ~S, ~S and ~S."
+                         label report parameter found foot residual bound))))
+        ;; A clamped arch from (0, 0) over (1, 1) to (2, 0). Its tangent at the start is along (1, 1).
+        (let ((knots (doubles 0d0 0d0 0d0 1d0 1d0 1d0)) (controls (doubles 0d0 0d0 1d0 1d0 2d0 0d0)))
+          (within "on the normal at a clamped start" knots 2 controls (doubles 0.5d0 -0.5d0) nearest:report-start 0d0)
+          (within "the first control point itself" knots 2 controls (doubles 0d0 0d0) nearest:report-start 0d0)
+          (strict "beyond a clamped start" knots 2 controls (doubles -1d0 -1d0) nearest:report-start 0d0)
+          (strict "a millionth before the normal at a clamped start" knots 2 controls (doubles 0.499999d0 -0.500001d0)
+                  nearest:report-start 0d0)
+          (destructuring-bind (found foot residual bound)
+              (answer "a millionth past the normal at a clamped start" knots 2 controls (doubles 0.500001d0 -0.499999d0))
+            (declare (ignore residual bound))
+            (assert (and (= found nearest:report-foot) (< 0d0 foot 1d-5)) ()
+                    "A foot just inside the start: report ~D at ~S." found foot)))
+        ;; A clamped cubic ending at (4, 0) along (1, -2): its normal there is along (2, 1). One point on
+        ;; it has coordinates that are exact and one has not, so the sign test from the control points
+        ;; meets a sum that is zero and one that is a rounding away from it.
+        (let ((knots (doubles 0d0 0d0 0d0 0d0 1d0 1d0 1d0 1d0)) (controls (doubles 0d0 0d0 1d0 2d0 3d0 2d0 4d0 0d0)))
+          (within "on the normal at a clamped end, exactly" knots 3 controls (doubles 4.5d0 0.25d0) nearest:report-end 1d0)
+          (within "on the normal at a clamped end, to a rounding" knots 3 controls (doubles 4.6d0 0.3d0)
+                  nearest:report-end 1d0)
+          (within "the last control point itself" knots 3 controls (doubles 4d0 0d0) nearest:report-end 1d0)
+          (strict "beyond a clamped end" knots 3 controls (doubles 5d0 -2d0) nearest:report-end 1d0))
+        ;; The same control points on knots that are not clamped: the curve runs from (1/2, 1) to
+        ;; (7/2, 1), neither of them a control point, and no test from the control points applies.
+        (let ((knots (doubles 0d0 1d0 2d0 3d0 4d0 5d0 6d0)) (controls (doubles 0d0 0d0 1d0 2d0 3d0 2d0 4d0 0d0)))
+          (within "the start of an unclamped curve" knots 2 controls (doubles 0.5d0 1d0) nearest:report-start 2d0)
+          (within "the end of an unclamped curve" knots 2 controls (doubles 3.5d0 1d0) nearest:report-end 4d0)
+          (within "on the normal at an unclamped start" knots 2 controls (doubles 0d0 1.25d0) nearest:report-start 2d0)
+          (strict "beyond an unclamped start" knots 2 controls (doubles -0.5d0 -1d0) nearest:report-start 2d0))))
+    (assert (and (= cases 13) (= (nearest-record-points record) 13) (zerop (nearest-record-unresolved record))) ()
+            "The ends: ~D cases, ~S." cases record)
+    (format t "SPLINE-NEAREST-ENDS-PASS cases=~D~%" cases)))
+
 (defun run-spline-nearest-tests ()
   (clrhash *nearest-exact*)
   (nearest-certificate-tests)
+  (nearest-end-tests)
   (nearest-refusal-tests)
   (let ((record (make-nearest-record)))
     (nearest-known-tests record)

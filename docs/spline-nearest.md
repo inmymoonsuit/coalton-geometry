@@ -2,7 +2,8 @@
 
 **State: `make-search` and `nearest!` are built in batch 3, 2026-11-23**, to the contract
 whose shape the library's first consumer accepted and whose derivation it checked by hand.
-[The record](batch3.md) has what was measured. `differentiate!` is specified here and not
+[The record](batch3.md) has what was measured, and [batch 3a](batch3a.md) what an outside
+audit changed. `differentiate!` is specified here and not
 built. Building it changed the derivation in four places after that check, each marked
 where it stands and [listed at the end](#as-built-what-changed-after-the-derivation-was-checked).
 The consumer has since checked the first of them by hand, accepted the second, and
@@ -88,11 +89,26 @@ One code for each point.
 | `foot` | The nearest point of the curve, at a parameter strictly inside the domain | written |
 | `start`, `end` | The nearest point of the curve is at that end of the domain | written; the parameter is the end exactly |
 | `tied` | A second least point of the distance, apart from the one returned, is within `tie` of being as near, or could not be shown not to be | written, for the nearer of those found |
-| `unresolved` | The depth, budget, or finite arithmetic could not certify one answer. This includes a potentially winning interval with an unrepresentable measure or an undecidable endpoint sign. | not a number, in every entry: no parameter is returned |
+| `unresolved` | The depth, budget, or finite arithmetic could not certify one answer. This includes a potentially winning interval with an unrepresentable measure. | not a number, in every entry: no parameter is returned |
 
-**`start` and `end` require evidence that the endpoint minimizes the distance.** A small
-residual at the end alone is not that evidence. A reported `foot` is strictly interior.
-All four measures of any resolved answer (including `tied`) are finite.
+**`start` and `end` say that the parameter returned is that end, and the residual says how
+the end was reached.** A reported `foot` is strictly interior. All four measures of any
+resolved answer (including `tied`) are finite.
+
+- **A residual beyond its returned bound**, above it at the start or below minus it at the
+  end: the distance strictly rises from that end into the curve, and the end is the least
+  point.
+- **A residual within its returned bound of zero**: the end is the least point at least *to
+  within that bound*. The least point is the end itself or a foot no farther from it in the
+  parameter than `(|residual| + bound) / H`, with `H` the lower bound of the residual's
+  derivative that showed the interval convex; the two measures do not say which. This is
+  the point on the normal at an end, where a foot is about to leave the end or has just
+  reached it. It is reported and not withheld: the parameter is right to the first
+  promise below, and a caller that needs to know that the end is strictly the least point
+  reads the two measures.
+
+An interval that might hold the nearest point and whose measures cannot be held is still
+`unresolved`: a residual that is not finite is evidence of nothing.
 
 `tied` and `unresolved` are reports and not refusals: the other points of the batch are
 answered.
@@ -282,9 +298,12 @@ nearest point of the curve is no farther than that.
      of inputs. `2^-40` times the sum of absolute products covers their relative rounding
      and that of the dot product in at most 256 dimensions; `2^-1060` covers product
      underflows. If every product has an exactly zero factor, the residual is exactly
-     zero. An inconclusive domain-end sign leaves the interval unresolved unless the
-     other end already excludes it. At an interior subdivision boundary a residual
-     within its error retains the existing approximate-foot convention.
+     zero;
+   - otherwise the residual at an end of `I` is zero to within its bound, and that end is
+     the candidate; where that is so at both ends, the nearer of them. This is so at an end
+     of the domain as at a boundary between two intervals: the least point of `I` is within
+     `(|ĝ| + e_g) / H` of that end in the parameter, and
+     [the report](#the-report-for-a-point) says what an end of the domain reached this way means.
 4. **Otherwise halved.** An interval that has been halved `depth` times is kept as
    unresolved, with the lower bound of the distance over it. Once `budget` intervals have
    been looked at for a point, every interval not yet looked at is unresolved, with no
