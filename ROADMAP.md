@@ -2,10 +2,10 @@
 
 ## Where it stands
 
-**Reserved, with groundwork.** The name, the repository, the ASDF system and the package
-prefix `coalton-geometry/` are taken. The toolchain is pinned and checked. The two rosters
-exist with no member. One measurement is made: how a point can be stored on the pinned
-compiler. A first consumer has said what it expects to need. No geometry is built.
+**Ready to start, with nothing built.** The toolchain is pinned and checked, the two
+rosters exist with no member, how a point is stored is measured and decided, the scope and
+design are agreed, and [a batch plan](docs/plan.md) follows a first consumer's ranking.
+[The groundwork's record](docs/batch0.md) has the evidence. No geometry is built.
 
 ## Before a first module
 
@@ -17,9 +17,11 @@ None of this is code.
 2. **What the design notes still leave open**, where the first module meets it: the
    layout of a derivative in its array, how near to degenerate counts, and the
    mathematical conventions, fixed in each contract.
-3. **A batch plan and a written contract for the first module**, with what each call
-   refuses, read by its consumer before any code, as the sister library did for its
-   harder modules. This is next.
+3. **The consumer's review** of [the batch plan](docs/plan.md) and of
+   [the first module's draft contract](docs/spline-basis.md), which ends in five
+   questions to it. Both are written and waiting to be read. No code before its answer.
+4. **A reference text on splines**, for the citation the provenance rule asks for. None
+   of the texts to hand treats B-splines.
 
 ## What a first consumer expects to need
 

@@ -2,11 +2,12 @@
 
 Geometry in [Coalton](https://github.com/coalton-lang/coalton), as a library of its own.
 
-**Status: reserved. No geometry is built yet.** This repository holds the groundwork a
-first module will stand on: a pinned toolchain that compiles and checks, the two rosters
-that every exported call will have to answer, one measurement that decides how a point is
-stored, and the decisions still open. [The roadmap](ROADMAP.md) says what is waited for
-before the first module.
+**Status: ready to start, with no geometry built yet.** This repository holds what a first
+module stands on: a pinned toolchain that compiles and checks, the two rosters that every
+exported call will have to answer, a measurement that decided how a point is stored, the
+design decisions, a [batch plan](docs/plan.md) and a
+[draft contract for the first module](docs/spline-basis.md). [The roadmap](ROADMAP.md)
+says what is waited for before that module is written.
 
 It is the sister of [coalton-linalg](https://github.com/inmymoonsuit/coalton-linalg),
 numerical linear algebra in Coalton, and is built to the same rules: contracts written
@@ -32,8 +33,10 @@ reference.
 | `coalton-geometry.asd` | The library system, with no component yet, and its test system |
 | `tests/representation-subject.ct`, `tests/representation-callers.ct`, `tests/representation.lisp` | How a point can be stored, measured on the pinned compiler; [the design notes](docs/design.md) rest on it |
 | `tests/aliasing.lisp`, `tests/scale-sweep.lisp` | The two [rosters](docs/rosters.md), with no member yet |
-| `scripts/`, `tools/`, `toolchain.lock.json` | The check runner and the pinned toolchain it verifies |
-| `docs/` | [Design decisions](docs/design.md), [provenance](docs/provenance.md), [rosters](docs/rosters.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
+| `scripts/`, `tools/`, `toolchain.lock.json` | The check runner, the pinned toolchain it verifies, and the runner for planted defects |
+| `tests/plants/` | Rosters of planted defects, one for each batch |
+| `CONTEXT.md` | [The library's mathematical conventions and terms](CONTEXT.md) |
+| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [rosters](docs/rosters.md), [the groundwork's record](docs/batch0.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
 
 ## Checking it
 
