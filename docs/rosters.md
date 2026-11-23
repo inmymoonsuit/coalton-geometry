@@ -20,11 +20,11 @@ an entry that names no member. A call joins by being declared.
 | Aliasing | has two or more arrays among its own parameters |
 | Scale sweep | mentions a floating-point number anywhere, or returns a status |
 
-**These rules were written for a library whose data is arrays, and are to be revisited
-with [the first design decision](design.md#how-a-point-is-held).** If points are held in
-arrays of coordinates, they stand. If a module takes points as values of their own, the
-aliasing rule has nothing to see and the question it asks, an output that is also an
-input, has to be asked of whatever can be written.
+**These rules were written for a library whose data is arrays, and that is what this one
+is**: [the design notes](design.md#how-a-point-is-held--decided) put held data and every
+routine's results in caller-owned arrays of coordinates. Should a module ever take points
+as values of their own, the aliasing rule would have nothing to see, and the question it
+asks, an output that is also an input, would have to be asked of whatever can be written.
 
 ## The aliasing roster
 

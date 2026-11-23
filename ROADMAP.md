@@ -11,15 +11,15 @@ compiler. A first consumer has said what it expects to need. No geometry is buil
 
 None of this is code.
 
-1. **The scope, agreed.** What the library is, that it may depend on the sister library,
-   and the order below.
-2. **The open decisions in [the design notes](docs/design.md)**: how a point is held,
-   what a predicate returns, who owns a tolerance, what a degenerate input gets, how a
-   derivative is returned. Each shapes every interface, so each is decided once, before
-   the first.
+1. ~~**The scope, agreed.**~~ Done 2026-11-22: [the design notes](docs/design.md) record
+   what the library is, how data is held, how derivatives and branches are reported, and
+   that it may depend on the sister library and does not yet.
+2. **What the design notes still leave open**, where the first module meets it: the
+   layout of a derivative in its array, how near to degenerate counts, and the
+   mathematical conventions, fixed in each contract.
 3. **A batch plan and a written contract for the first module**, with what each call
    refuses, read by its consumer before any code, as the sister library did for its
-   harder modules.
+   harder modules. This is next.
 
 ## What a first consumer expects to need
 

@@ -44,9 +44,13 @@ answers by name. It does not return a number that happens to come out.
 ## Clean room
 
 A published method may be implemented from its description: the mathematics, the prose,
-the error analysis. Another implementation's code is never consulted or copied, whatever
-its licence, and that includes code published beside a paper. Record every source and its
-licence in [provenance](docs/provenance.md) before the code that uses it lands.
+the error analysis. Pseudocode may be read to learn what a method is; the implementation
+is then written from the mathematics, in the structure this library's contracts give it,
+and never rendered from the listing statement by statement. Another implementation's code
+is never read, whatever its licence, and that includes code published beside a paper and
+a consumer's own implementation. [Provenance](docs/provenance.md) has the rule in full,
+how a reviewer checks it, and the register: record every source there, cited to the page
+and the equation, before the code that uses it lands.
 
 ## Evidence
 
