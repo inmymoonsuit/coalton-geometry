@@ -156,6 +156,25 @@ function of the exponent that returns the outputs. The run's source is kept, to 
   "Six control points of the plane for the knots above, of mixed sign."
   (doubles 1d0 -2d0 3d0 0.5d0 -1.5d0 4d0 2d0 2d0 -3d0 1d0 0.25d0 -0.75d0))
 
+(defun sweep-search (call knots controls points step foot-power distance-power residual-power speed-power)
+  "One search, by CALL, of a cubic of the plane for three points, and its outputs with the powers they move by. A point
+left unresolved is a refusal of the run: no parameter was returned for it."
+  (let* ((search (nearest:make-search (basis:make-basis 3 knots 2) 2 60 4000))
+         (feet (make-array 3 :element-type 'double-float :initial-element 0d0))
+         (reports (make-array 3 :element-type '(unsigned-byte 62) :initial-element 0))
+         (measures (make-array 12 :element-type 'double-float :initial-element 0d0))
+         (status (funcall call search controls points (doubles) step 0d0 feet reports measures)))
+    (unless (eq status (coalton:coalton nearest:SearchSuccess))
+      (error "nearest! returned ~A" status))
+    (when (find 4 reports)
+      (error "nearest! left a point unresolved: ~S" reports))
+    (flet ((column (k) (coerce (loop :for i :from 0 :below 3 :collect (aref measures (+ (* 4 i) k)))
+                               '(simple-array double-float (*)))))
+      (list (sweep-out "parameters" feet foot-power) (sweep-out "reports" reports 0)
+            (sweep-out "distances" (column 0) distance-power)
+            (sweep-out "residuals" (column 1) residual-power)
+            (sweep-out "speeds" (column 3) speed-power)))))
+
 (defun sweep-roster ()
   "The entries."
   (list
@@ -252,7 +271,34 @@ function of the exponent that returns the outputs. The run's source is kept, to 
                (sweep-out "the second derivative" (subseq out 4 6) -2)
                (sweep-out "batch points" (sweep-rows batch-out 2 0) 0)
                (sweep-out "batch first derivatives" (sweep-rows batch-out 2 1) -1)
-               (sweep-out "batch second derivatives" (sweep-rows batch-out 2 2) -2)))))))
+               (sweep-out "batch second derivatives" (sweep-rows batch-out 2 2) -2)))))
+
+   ;; A parameter is promised to within the step, 10^-12 here, and not bit for bit: where the
+   ;; search stops depends on error bounds that have terms which do not move with the scale. So
+   ;; these two entries are compared to 10^-10. A point left unresolved is a refusal of the run.
+   ;; The residual is a product of two lengths, so it leaves the range at half the exponent a
+   ;; length does: from 2^512 the search can show nothing and says so, and at 2^510 it already
+   ;; cannot although every answer could still be held, which is its limit.
+   (sweep-entry "a search, the curve and the points scaled"
+       (nearest:nearest!) 1d-10
+       ((-1020 -600 :refused) (-520 -510 :lost) (-400 400 :exact) (510 510 :limit) (512 1020 :refused))
+     (lambda (k)
+       (sweep-search #'nearest:nearest! (doubles 0d0 0d0 0d0 0d0 1d0 1d0 1d0 1d0)
+                     (sweep-array (doubles 0.5d0 0.25d0 0.75d0 3d0 2d0 3.5d0 2.5d0 0.5d0) k)
+                     (sweep-array (doubles 1.5d0 4.5d0 0.25d0 -1d0 3d0 -0.5d0) k) 1d-12 0 1 2 1)))
+
+   ;; With the knots scaled the derivatives move by the scale to the powers -1, -2 and -3, and
+   ;; the bounds are built from all three. Beyond 2^300 either way what underflow could have
+   ;; lost is what the bounds consist of, nothing can be shown, and every point is unresolved:
+   ;; the range of scales the contract speaks of. At 2^-1000 the step itself is no input.
+   (sweep-entry "a search, the knots scaled"
+       (nearest:nearest!) 1d-10
+       ((-1020 -1000 :no-input) (-800 -510 :limit) (-400 -400 :close) (-300 300 :exact) (400 800 :limit)
+        (1000 1020 :refused))
+     (lambda (k)
+       (sweep-search #'nearest:nearest! (sweep-array (doubles 1d0 1d0 1d0 1d0 2d0 2d0 2d0 2d0) k)
+                     (doubles 0.5d0 0.25d0 0.75d0 3d0 2d0 3.5d0 2.5d0 0.5d0)
+                     (doubles 1.5d0 4.5d0 0.25d0 -1d0 3d0 -0.5d0) (sweep-number 1d-12 k) 1 0 -1 -1)))))
 
 ;;; ---- The roster against the sources, and its run -------------------------------------------
 

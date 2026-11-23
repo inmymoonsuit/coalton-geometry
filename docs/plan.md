@@ -1,7 +1,8 @@
 # Batch plan
 
-State: reviewed and accepted by the library's first consumer on 2026-11-22. **Batches 1
-and 2 are built** (records: [batch 1](batch1.md), [batch 2](batch2.md)); nothing else is. [The roadmap](../ROADMAP.md) has the
+State: reviewed and accepted by the library's first consumer on 2026-11-22. **Batches 1,
+2 and 3 are built** (records: [batch 1](batch1.md), [batch 2](batch2.md),
+[batch 3](batch3.md)); nothing else is. [The roadmap](../ROADMAP.md) has the
 consumer's ranking this plan follows; [the design notes](design.md) have the decisions
 every batch rests on.
 
@@ -9,7 +10,9 @@ every batch rests on.
 each to be sent as a draft contract for its review, with code after it signs: the
 derivatives with respect to control points and the interface of the batched search are
 where its answers shape the design. Batch 2's was signed as written the same day and is
-built. Batch 3's is drafted and with the consumer.
+built. Batch 3's was accepted in shape, its bounds derived and checked by the consumer by
+hand, and it is built, but for the derivatives of the foot, which are left for a batch of
+their own.
 
 **Batch 2 is the curve that is not rational.** The consumer's splines are not rational and
 no text to hand treats a rational one, so the rational curve is left out of batch 2 and
@@ -26,7 +29,7 @@ need, adjusted so that nothing is built before what it stands on.
 | --- | --- | --- | --- |
 | 1, built | `spline/basis` | B-spline basis functions and their derivatives at a parameter, and for a batch of parameters | nothing |
 | 2, built | `spline/curve` | A point of a B-spline curve and its derivatives with respect to the parameter, with the weights that are its derivatives with respect to the control points. [Contract](spline-curve.md) | 1 |
-| 3, drafted | `spline/nearest` | The parameter of the nearest point of a spline curve to each of a batch of points, with its branch report, and its derivatives when asked. [Draft contract](spline-nearest.md) | 2 |
+| 3, built | `spline/nearest` | The parameter of the nearest point of a spline curve to each of a batch of points, with its branch report. [Contract](spline-nearest.md). Its derivatives are specified there and not built | 2 |
 | 4 | `conic/ellipse` | For an ellipse: the parameter of a point, nearest and farthest points, radius of curvature, quadrant points, each with derivatives | nothing |
 | 5 | `conic/parabola` | For a parabola: parameter, derivative, radius of curvature, construction from a focus | nothing |
 | 6 | `rotation` | Exponential and logarithm between rotation vectors and unit quaternions, composition, left and right Jacobians, an angle followed across whole turns | nothing |

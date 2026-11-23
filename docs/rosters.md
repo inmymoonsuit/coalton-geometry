@@ -7,8 +7,8 @@ are in place here before the first call so that no call is ever outside them.
 the questions; [the sister library's page](https://github.com/inmymoonsuit/coalton-linalg/blob/main/docs/rosters.md)
 has the same machinery with its members and what it found.
 
-**The calls of the two modules are the members today**: three calls take more than one
-array, and eight take or return floating-point numbers or return a status. Beside them run the
+**The calls of the three modules are the members today**: four calls take more than one
+array, and nine take or return floating-point numbers or return a status. Beside them run the
 machinery's own controls.
 
 ## Membership is read from the sources

@@ -1,0 +1,50 @@
+(cl:defpackage #:coalton-geometry/tests/spline-nearest-callers
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:basis #:coalton-geometry/spline/basis)
+                    (#:nearest #:coalton-geometry/spline/nearest))
+  (:export #:make-code #:nearest-code #:nearest-loop))
+(cl:in-package #:coalton-geometry/tests/spline-nearest-callers)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; A caller's side of the search module, compiled in a file and a package of its own.
+
+(coalton-toplevel
+  (declare status-code (nearest:SearchStatus -> UFix))
+  (define (status-code status)
+    (match status
+      ((nearest:SearchSuccess) 0)
+      ((nearest:SearchBadSize) 1)
+      ((nearest:SearchBadTolerance) 2)
+      ((nearest:SearchNonFinite) 3)))
+
+  (declare make-code (basis:Basis * UFix * UFix * UFix -> UFix))
+  (define (make-code handle dimension depth budget)
+    "0 when a search is made; otherwise the number of the rule that refused the basis, and 99 for an error that is not the library's own."
+    (catch (progn (nearest:make-search handle dimension depth budget) 0)
+      ((the nearest:SearchError problem)
+       (match problem
+         ((nearest:DegreeBelowTwo _) 1)
+         ((nearest:OrderBelowTwo _) 2)
+         ((nearest:KnotTooRepeated _) 3)
+         ((nearest:BadDimension _) 4)))
+      (_ 99)))
+
+  (declare nearest-code (nearest:Search * arr:LispArray F64 * arr:LispArray F64 * arr:LispArray F64 * F64 * F64
+                         * arr:LispArray F64 * arr:LispArray UFix * arr:LispArray F64 -> UFix))
+  (define (nearest-code search controls points hints step tie feet reports measures)
+    "The status of nearest! as a number, or 108 for an output that is an input, and 199 for any other error."
+    (catch (status-code (nearest:nearest! search controls points hints step tie feet reports measures))
+      ((the basis:BasisError problem)
+       (match problem
+         ((basis:OutputAliased _) 108)
+         (_ 109)))
+      (_ 199)))
+
+  (declare nearest-loop (nearest:Search * arr:LispArray F64 * arr:LispArray F64 * arr:LispArray F64 * F64 * F64
+                         * arr:LispArray F64 * arr:LispArray UFix * arr:LispArray F64 * arr:LispArray UFix * UFix
+                         -> Void))
+  (define (nearest-loop search controls points hints step tie feet reports measures tally count)
+    "count calls of nearest!. The calls that do not succeed are counted into tally[0]."
+    (for ((round 0 (+ round 1))) :while (< round count)
+      (unless (== (nearest:nearest! search controls points hints step tie feet reports measures) nearest:SearchSuccess)
+        (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))

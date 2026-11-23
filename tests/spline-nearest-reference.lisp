@@ -57,21 +57,33 @@
       (dolist (term found (poly-trim quotient))
         (setf (nth (car term) quotient) (cdr term))))))
 
+(defun poly-primitive (p)
+  "P times the number above zero that makes its coefficients whole with nothing in common. It has the roots of P and
+its sign everywhere, and its coefficients are as small as a multiple's can be: without this the numbers of a chain
+of remainders grow at every step."
+  (if (null p)
+      '()
+      ;; Both begin from a value, so that a single coefficient is not handed back as it is, sign and all.
+      (let* ((whole (reduce #'lcm p :key #'denominator :initial-value 1))
+             (scaled (mapcar (lambda (c) (* c whole)) p))
+             (common (reduce #'gcd scaled :initial-value 0)))
+        (mapcar (lambda (c) (/ c common)) scaled))))
+
+(defun poly-chain (p)
+  "P, its derivative, and the remainders of each on the one after with their signs changed, each made primitive."
+  (let ((chain (list (poly-primitive (poly-derivative p)) (poly-primitive p))))
+    (loop :for r := (and (first chain) (poly-remainder (second chain) (first chain)))
+          :while r
+          :do (push (poly-primitive (poly-scale r -1)) chain))
+    (remove nil chain)))
+
 (defun poly-sturm (p)
   "The Sturm chain of the polynomial with the roots of P, each once: P is first divided by what it shares with its
 derivative."
-  (let ((chain (list (poly-derivative p) p)))
-    (loop :for r := (poly-remainder (second chain) (first chain))
-          :while r
-          :do (push (poly-scale r -1) chain))
-    ;; The last of the chain is what P shares with its derivative. Dividing P by it leaves every root once.
-    (let* ((shared (first chain))
-           (simple (if (> (length shared) 1) (poly-quotient p shared) p))
-           (again (list (poly-derivative simple) simple)))
-      (loop :for r := (and (first again) (poly-remainder (second again) (first again)))
-            :while r
-            :do (push (poly-scale r -1) again))
-      (reverse (remove nil again)))))
+  ;; The last of the chain is what P shares with its derivative. Dividing P by it leaves every root once.
+  (let* ((shared (first (poly-chain p)))
+         (simple (if (> (length shared) 1) (poly-quotient p shared) p)))
+    (reverse (poly-chain simple))))
 
 (defun poly-variations (chain x)
   (let ((signs (remove 0 (mapcar (lambda (q) (signum (poly-value q x))) chain))))
@@ -94,6 +106,16 @@ that holds it and no other, in increasing order. A root that is a rational endpo
                        (cond
                          ((zerop n))
                          ((and (= n 1) (<= (- b a) width)) (push (cons a b) found))
+                         ;; One root, and the polynomial is not zero at either end: it changes sign
+                         ;; there, so the interval is narrowed by the sign alone, without the chain.
+                         ((and (= n 1) (not (zerop (poly-value simple a))))
+                          (let ((left a) (right b) (rising (plusp (poly-value simple b))) (exact nil))
+                            (loop :until (or exact (<= (- right left) width))
+                                  :do (let* ((m (/ (+ left right) 2)) (value (poly-value simple m)))
+                                        (cond ((zerop value) (setf exact m))
+                                              ((eq rising (plusp value)) (setf right m))
+                                              (t (setf left m)))))
+                            (push (if exact (cons exact exact) (cons left right)) found)))
                          (t (let ((m (/ (+ a b) 2)))
                               (cond
                                 ((zerop (poly-value simple m))
@@ -211,7 +233,11 @@ equally far from a whole piece of the curve, and no list of least points describ
       (assert (and (= 2 (length roots)) (holds (first roots) 1) (holds (second roots) 3/2)) ()
               "With a double root the roots found are ~S." roots))
     (assert (equal '((0 . 0) (2 . 2)) (poly-roots (poly-multiply '(0 1) '(-2 1)) 0 2 (expt 2 -40))))
-    (assert (null (poly-roots '(1 0 1) -5 5 1/8))))
+    (assert (null (poly-roots '(1 0 1) -5 5 1/8)))
+    ;; A chain keeps the sign of every member: a remainder that is one number below zero stays below zero.
+    (assert (equal '((1 0 1) (0 1) (-1)) (poly-sturm '(1 0 1))))
+    (assert (equal '(-1 2) (poly-primitive '(-1/2 1))))
+    (assert (equal '(-1 2) (poly-primitive '(-3/2 3)))))
   ;; A parabola: the curve (u, u^2) on [0, 1] as a quadratic with no interior knot, control
   ;; points (0, 0), (1/2, 0), (1, 1). From (0, 1/2) the residual is 2 u^3, with one foot at u = 0,
   ;; which is the start of the domain; the distance rises from it, so the least point is the start.

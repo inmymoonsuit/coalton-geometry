@@ -2,6 +2,16 @@
 
 Changes a caller can meet.
 
+## 0.3.0 — 2026-11-23
+
+New package `coalton-geometry/spline/nearest`: `make-search` and `nearest!` give, for a
+batch of points, the parameter of a B-spline curve nearest to each, shown to be the nearest
+of the whole curve, with a report of an end of the domain, of a second answer within a
+tolerance, or of an answer that could not be shown; and the distance, the residual with a
+bound, and the speed. [Its contract](docs/spline-nearest.md) has what is promised and the
+derivation of every bound. The basis and curve modules are unchanged.
+[Batch 3's record](docs/batch3.md) has the measurements.
+
 ## 0.2.0 — 2026-11-23
 
 New package `coalton-geometry/spline/curve`: `evaluate!` and `evaluate-batch!` give a point

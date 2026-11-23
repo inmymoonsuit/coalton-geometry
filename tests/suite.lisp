@@ -7,6 +7,7 @@
   (run-spline-basis-tests)
   (run-spline-curve-tests)
   (exact-nearest-reference-tests)
+  (run-spline-nearest-tests)
   (run-aliasing-tests)
   (run-scale-sweep-tests)
   (format t "TESTS-PASS~%"))

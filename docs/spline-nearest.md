@@ -1,10 +1,11 @@
 # The nearest parameter of a B-spline curve to a point
 
-**State: contract for batch 3. The library's first consumer accepted its shape on
-2026-11-23 and answered its questions; the bounds it asked to have derived before any code
-are derived below, and it has checked the derivation by hand and had two constants
-corrected. Nothing here is built.** Deriving the bounds changed the wording of two
-promises, which is said where they stand.
+**State: `make-search` and `nearest!` are built in batch 3, 2026-11-23**, to the contract
+whose shape the library's first consumer accepted and whose derivation it checked by hand.
+[The record](batch3.md) has what was measured. `differentiate!` is specified here and not
+built. Building it changed the derivation in four places after that check, each marked
+where it stands and [listed at the end](#as-built-what-changed-after-the-derivation-was-checked)
+for the consumer's review.
 
 Package `coalton-geometry/spline/nearest`. It stands on [the curve module](spline-curve.md)
 and [the basis module](spline-basis.md), and on [the conventions](../CONTEXT.md#curves):
@@ -28,11 +29,17 @@ For a curve `C` on the domain `[a, b]` and a point `X`, the parameter `t` at whi
 
 ## What a search is
 
-`make-search(basis, dimension, depth) -> Search`
+`make-search(basis, dimension, depth, budget) -> Search`
 
 A handle for one basis and one dimension. It allocates every workspace a later call uses,
-and no later call allocates. `depth` bounds the work spent on one point: how many times a
-span of the curve may be halved, and halved again, while looking for it.
+and no later call allocates. Two numbers bound the work spent on one point: `depth`, how
+many times one interval of the curve may be halved, and `budget`, how many intervals may
+be looked at in all. The first alone is no bound on the work, since where nothing can be
+set aside the intervals double at every halving; a curve that is a single point is such a
+case. A point that spends either is reported `unresolved`.
+
+*Found by the tests.* The draft had `depth` alone and called it a bound on the work. At a
+depth of 60 a search that set nothing aside did not end.
 
 The curve must be smooth enough to search. A typed error is raised, before anything is
 allocated, for:
@@ -80,7 +87,7 @@ One code for each point.
 | `foot` | The nearest point of the curve, at a parameter strictly inside the domain | written |
 | `start`, `end` | The nearest point of the curve is at that end of the domain | written; the parameter is the end exactly |
 | `tied` | A second least point of the distance, apart from the one returned, is within `tie` of being as near, or could not be shown not to be | written, for the nearer of those found |
-| `unresolved` | The work allowed by `depth` ran out before the curve could be shown to hold one answer. A curve that is a single point, or a point at the centre of an arc, ends here | not a number, in every entry: no parameter is returned |
+| `unresolved` | The work allowed by `depth` or by `budget` ran out before the curve could be shown to hold one answer. A curve that is a single point, or a point at the centre of an arc, ends here; so does a point for which the distance has a greatest value within `tie` of its least, since the tests cannot tell a greatest value from a least point not yet found | not a number, in every entry: no parameter is returned |
 
 **`start` and `end` are decided by the parameter returned and by nothing else.** The
 report is `foot` exactly when the returned parameter is strictly between the ends of the
@@ -151,6 +158,15 @@ the `D` coordinates, off by at most `γ(D)` of itself. With the dimension at mos
 whole is off by less than `2^-44` of itself, which the margin covers with room. So a
 comparison can only err toward keeping an interval, never toward setting one aside. That
 is where the limit on the dimension comes from.
+
+**And one for underflow.** A product that underflows loses less than `2^-1074`, which no
+relative margin covers. So `2^-1060` is added to every bound that is formed from
+products, and the sums of magnitudes that bound the third differences carry `2^-1030` at
+each level, of which the `2^-40` taken is more than an underflow at that level and every
+division after it can have lost. Where the knots are so large or so small that these
+additions are what the bounds consist of, nothing can be shown and a point is
+`unresolved`: the search has a range of scales, which [the record](batch3.md) gives as
+measured, and outside it the answer is that there is none, never a wrong one.
 
 ### What is known of a whole span
 
@@ -257,7 +273,9 @@ nearest point of the curve is no farther than that.
    - otherwise the residual at an end is zero to within its bound, and that end is the
      candidate; where that is so at both ends, the nearer of them.
 4. **Otherwise halved.** An interval that has been halved `depth` times is kept as
-   unresolved, with the lower bound of the distance over it.
+   unresolved, with the lower bound of the distance over it. Once `budget` intervals have
+   been looked at for a point, every interval not yet looked at is unresolved, with no
+   bound on what it holds.
 
 As an interval shrinks about a foot at which `h` is above zero, the lower bound of `h`
 tends to `h` itself, so the convex test succeeds after finitely many halvings. That is why
@@ -269,17 +287,22 @@ A bracket whose left end has a residual shown below zero and whose right end one
 above. The iterate starts at the middle. At each iterate the residual and `h` are
 computed. If the residual is within its `e_g` of zero, the iterate is returned. Otherwise
 it replaces the end of the bracket whose sign it shares; if the bracket is then no wider
-than `step`, or its ends are neighbouring doubles, it is returned. The next iterate is
-the Newton step where that lies strictly inside the bracket and the pass before at least
-halved the bracket, and the bracket's middle otherwise.
+than `step`, or its ends are neighbouring doubles, it is returned.
+
+*As built.* The next iterate is the Newton step where `h` is above zero, the step is at
+most half as long as the one before it, and it lands strictly inside the bracket; it is
+the bracket's middle otherwise. So either the steps halve or the bracket does, and the
+search ends; a limit of 4096 passes stands behind that, and a search that reached it would
+leave its interval unresolved. The draft had asked instead that the pass before had halved
+the bracket, which would have made every other pass a bisection and thrown away what
+Newton's method had gained.
 
 Newton's method approaches from one side and can leave the other end of the bracket where
-it was. So when a Newton step is shorter than a quarter of `step`, the residual is
-computed half of `step` to each side of where it lands, inside the bracket. Signs shown
-opposite there are the two parameters of the first promise, no more than `step` apart;
-signs not shown at all are a residual within its bound; and anything else moves the
-bracket and the iteration goes on. Of any two passes one at least halves the bracket, so
-the search ends.
+it was. So a Newton step shorter than a quarter of `step` is carried half of `step`
+further, to land on the far side of the foot. The bracket is then no wider than `step`:
+those are the two parameters of the first promise. Where the arithmetic cannot show a sign
+that close to the foot, the residual there is within its bound, which is the other half of
+that promise.
 
 ### Choosing among the candidates
 
@@ -289,11 +312,27 @@ same least point, since a function convex on each of two intervals that touch, w
 continuous derivative, is convex on both: the nearer of the two is kept and the other is
 not a second answer.
 
+**A candidate is a parameter at or near a least point, not the least point.** The distance
+computed at it bounds the least point's from above. From below, a candidate at an end of
+the domain, where the least point is that end exactly, is bounded by `d̂ - e_d`. A
+candidate of a convex interval is bounded by less: with `H` the lower bound of `h` that
+showed the interval convex, half the squared distance lies above its tangent parabola of
+curvature `H` at the candidate, whose least value is lower by the squared residual over
+`2H`. So the distance at the least point is at least
+
+    floor  =  √( (d̂ - e_d)² - (|ĝ| + e_g)² / H ),  or zero if that is negative
+
+*Found by the tests.* The derivation the consumer checked compared `d̂ - e_d` of one
+candidate with another's distance. A parameter returned within `step` of a foot is that
+far from it along the curve, and on a curve that crosses a point twice the two computed
+distances were `4 × 10^-12` and `2 × 10^-15`, where both least points are at distance
+zero: an exact tie was reported as none. The floor above is what was missing.
+
 With `d1`, `e1` the distance and its error at the nearest candidate:
 
 - **`unresolved`** if there is no candidate, or if some unresolved interval's lower bound
   of the distance is at most `(d1 + e1 + tie)(1 + 2^-40)`;
-- otherwise **`tied`** if another candidate's `d̂ - e_d` is at most that;
+- otherwise **`tied`** if another candidate's floor is at most that;
 - otherwise `start`, `end` or `foot`, by the parameter.
 
 **Why this is the nearest of the whole curve.** The distance is continuous on a closed
@@ -310,6 +349,10 @@ test 1 sets aside with any `U` that is truly an upper bound holds nothing the pr
 speak of.
 
 ## Derivatives of the foot, asked for apart
+
+**Specified, and not built in batch 3.** The first consumer does not need it for its first
+use. It is a batch of its own, whose error bound is derived before its code as the others
+were.
 
 `differentiate!(search, controls, points, feet, reports, spans, by-point, by-controls) -> SearchStatus`
 
@@ -365,10 +408,13 @@ point near a curve that does not fold back toward it costs a few tens of evaluat
 ## Where the method is read
 
 The convex hull property of a segment and of its derivative: the reference text, 5.7 and
-5.6. Newton's method in floating point: Higham, chapter 25, to be read when the batch is
-built. The bounds over an interval, the tests, the bracket and the rule for a tie are
-derived above from those, from the two contracts this module stands on and from the mean
-value inequality; no text to hand gives them and none was read for them.
+5.6. The bounds over an interval, the tests, the bracket with its Newton step and the rule
+for a tie are derived above from those, from the two contracts this module stands on, from
+the mean value inequality and from the convexity of a function whose second derivative is
+above zero; no text to hand gives them and none was read for them. The draft had named a
+chapter on Newton's method in floating point to be read when the batch was built. It was
+not read: what the search needs of Newton's method is that a step from inside a bracket
+either lands inside it or is replaced, which is derived here.
 
 ## Settled with the first consumer before this draft
 
@@ -405,3 +451,22 @@ contract to be written to.
     speed is at most a small multiple of the size of the control points.
 11. **An answer is interior only when its parameter is strictly inside the domain.** The
     report is decided by the parameter, as said above.
+
+## As built: what changed after the derivation was checked
+
+Four things, each found by building or by the tests, and each for the consumer to accept
+or refuse. The interface is as it accepted it but for the second.
+
+1. **A candidate is not its least point.** The tie rule compared distances computed at
+   returned parameters. A least point is only near its parameter, so each candidate now
+   carries a lower bound of the distance at the least point itself, the `floor` of
+   [the derivation](#choosing-among-the-candidates). The tests found an exact tie reported
+   as none.
+2. **`make-search` takes a `budget` as well as a `depth`.** A depth alone does not bound
+   the work.
+3. **A second device, for underflow**, beside the one for rounding, and with it a range of
+   scales outside which every point is unresolved.
+4. **The rule for when a Newton step is taken** is that it is at most half the step before,
+   not that the pass before halved the bracket.
+
+And `differentiate!` is left for a batch of its own.

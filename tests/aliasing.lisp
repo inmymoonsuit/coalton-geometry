@@ -175,7 +175,17 @@ expected of each pair that can be one array. An entry of (key :exempt reason) ha
                           (make-array 16 :element-type 'double-float :initial-element 0d0)))
          (let ((handle (basis:make-basis 1 (doubles 0d0 0d0 1d0 1d0) 1)))
            (lambda (a) (cc:batch-code handle (first a) 2 (second a) 1 (third a) (fourth a) (fifth a))))
-         '(((0 1) :same) ((3 4) :refused)))))
+         '(((0 1) :same) ((3 4) :refused)))
+   ;; A cubic of the plane with four control points and two points to search for: the control
+   ;; points and the measures then have eight entries each, and the hints and the parameters two.
+   ;; Each of those pairs has an output in it.
+   (list "coalton-geometry/spline/nearest:nearest!"
+         (lambda () (list (doubles 0d0 0d0 0d0 3d0 2d0 3d0 2d0 0d0) (doubles 1d0 4d0 0d0 -1d0) (doubles 0.5d0 0.1d0)
+                          (doubles 0d0 0d0) (indices 9 9)
+                          (make-array 8 :element-type 'double-float :initial-element 0d0)))
+         (let ((search (nearest:make-search (basis:make-basis 3 (doubles 0d0 0d0 0d0 0d0 1d0 1d0 1d0 1d0) 2) 2 40 2000)))
+           (lambda (a) (nc:nearest-code search (first a) (second a) (third a) 1d-12 0d0 (fourth a) (fifth a) (sixth a))))
+         '(((0 5) :refused) ((2 3) :refused)))))
 
 (defun alias-missing (inventory keys)
   "Members of the inventory the roster does not name, and names in the roster that are not members."

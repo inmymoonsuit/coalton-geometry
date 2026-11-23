@@ -69,13 +69,15 @@ the control points, 5.6, p. 67, equation (1), which are the routes its exact ref
 takes; every derivative of a segment at a parameter, as its Taylor expansion, 5.9, p. 70.
 **The rational curve is not in this batch and has no text here**: see below.
 
-### Batch 3, `spline/nearest`
+### Batch 3, `spline/nearest`, built
 
-Prautzsch, Boehm and Paluszny, 4.8, p. 55: the parameter of a point near a curve improved
-by the nearest point of the tangent. That is a first-order step. The plan's step uses the
-second derivative as well and is safeguarded, and the section gives neither. Subdivision,
-3.3, p. 27, for a start that does not depend on a guess. Higham, chapter 25, for what
-Newton's method can deliver in floating point.
+Prautzsch, Boehm and Paluszny, 5.7, p. 69, and 5.6, p. 67: a segment lies in the convex
+hull of the control points of its span, and so does its derivative in the hull of its own.
+That is all the search takes from a text; [the register](provenance.md#the-register) says
+what it derives. Section 4.8, p. 55, improves a parameter by the nearest point of the
+tangent, a first-order step, and was read and not used: the search's step uses the second
+derivative and is kept inside a bracket. Subdivision, 3.3, and Higham's chapter 25 were
+named for this batch before it was designed and were not read.
 
 ### Batches 4 and 5, `conic/ellipse` and `conic/parabola`
 
@@ -108,8 +110,9 @@ Each is a need on [the plan](plan.md) with nothing yet to cite. None blocks batc
   and derivatives of a rational curve follow from the polynomial ones by the quotient
   rule, which may be all the citation needs; a text that treats them would settle the
   conventions for weights.
-- **A safeguarded search for the nearest parameter**, for batch 3: the global start, the
-  safeguard, and the derivative of the result by the implicit function theorem.
+- ~~**A safeguarded search for the nearest parameter**, for batch 3.~~ Derived in the
+  search's own contract, with no text. The derivative of the result, by the implicit
+  function theorem, is specified there and not yet built.
 - **The nearest and farthest points of an ellipse**, for batch 4. The description best
   known is published beside code that implements it, which the rule excludes.
 - **The derivative of the exponential map of rotations**, for batch 6: the left and right

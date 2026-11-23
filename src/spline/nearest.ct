@@ -1,0 +1,810 @@
+(cl:defpackage #:coalton-geometry/spline/nearest
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:math #:coalton/math)
+                    (#:basis #:coalton-geometry/spline/basis) (#:curve #:coalton-geometry/spline/curve))
+  (:export #:Search #:make-search #:search-dimension #:search-depth #:search-budget
+           #:SearchError #:DegreeBelowTwo #:OrderBelowTwo #:KnotTooRepeated #:BadDimension
+           #:SearchStatus #:SearchSuccess #:SearchBadSize #:SearchBadTolerance #:SearchNonFinite
+           #:report-foot #:report-start #:report-end #:report-tied #:report-unresolved
+           #:nearest!))
+(cl:in-package #:coalton-geometry/spline/nearest)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; The parameter of a B-spline curve nearest to each of a batch of points. docs/spline-nearest.md
+;;; is the contract: what is promised, and the derivation of every bound used here, section by
+;;; section. Names below are that derivation's. docs/provenance.md says what was read.
+
+(coalton-toplevel
+  (define-exception SearchError
+    "Why a search could not be made for a basis. Raised before anything is allocated."
+    (DegreeBelowTwo UFix)
+    "The degree of the basis, which is below 2."
+    (OrderBelowTwo UFix)
+    "The highest order the basis was made for, which is below 2."
+    (KnotTooRepeated UFix)
+    "The index of the first of a run of equal interior knots as long as the degree: the tangent can turn there."
+    (BadDimension UFix)
+    "The dimension given, which is zero or above 256.")
+
+  (derive Eq)
+  (repr :enum)
+  (define-type SearchStatus
+    "Outcome of nearest!, which is about its inputs. Every status but SearchSuccess writes nothing."
+    SearchSuccess
+    "Every point has its parameter, its report and its measures."
+    SearchBadSize
+    "An array's length is not what the call needs."
+    SearchBadTolerance
+    "The step or the tie is negative or not a finite number."
+    SearchNonFinite
+    "A coordinate of a point or of a control point, or a hint, is not finite.")
+
+  (declare report-foot UFix)
+  (define report-foot
+    "The report of a point whose nearest point of the curve is at a parameter strictly inside the domain."
+    0)
+  (declare report-start UFix)
+  (define report-start
+    "The report of a point whose nearest point of the curve is the start of the domain."
+    1)
+  (declare report-end UFix)
+  (define report-end
+    "The report of a point whose nearest point of the curve is the end of the domain."
+    2)
+  (declare report-tied UFix)
+  (define report-tied
+    "The report of a point for which a second least point is within the tie of as near, or could not be shown not to be."
+    3)
+  (declare report-unresolved UFix)
+  (define report-unresolved
+    "The report of a point for which the work allowed ran out. No parameter is returned for it."
+    4)
+
+  (define-struct SearchStorage
+    "The basis, the bounds that depend on the knots alone, and every workspace a call uses."
+    (handle basis:Basis)
+    (dim UFix)
+    (limit UFix)
+    (budget UFix)
+    (p UFix)
+    (wone (arr:LispArray F64))
+    (wtwo (arr:LispArray F64))
+    (mone (arr:LispArray F64))
+    (mthree (arr:LispArray F64))
+    (rows0 (arr:LispArray F64))
+    (out0 (arr:LispArray F64))
+    (rows1 (arr:LispArray F64))
+    (out1 (arr:LispArray F64))
+    (rows2 (arr:LispArray F64))
+    (out2 (arr:LispArray F64))
+    (delta (arr:LispArray F64))
+    (vec (arr:LispArray F64))
+    (slo (arr:LispArray F64))
+    (shi (arr:LispArray F64))
+    (slevel (arr:LispArray UFix))
+    (num (arr:LispArray F64))
+    (state (arr:LispArray UFix)))
+
+  (repr :transparent)
+  (define-type Search
+    "Private handle for one basis and one dimension; make one with make-search. Calls sharing a handle are not reentrant."
+    (MkSearch SearchStorage))
+
+  (inline)
+  (declare storage (Search -> SearchStorage))
+  (define (storage search) (match search ((MkSearch kept) kept)))
+
+  ;; ---- Numbers the derivation names, each in a slot of the handle's array of numbers -------
+
+  (declare n-gamma UFix) (define n-gamma 0)
+  (declare n-tau UFix) (define n-tau 1)
+  (declare n-a UFix) (define n-a 2)
+  (declare n-b UFix) (define n-b 3)
+  (declare n-eps0 UFix) (define n-eps0 4)
+  (declare n-eps1 UFix) (define n-eps1 5)
+  (declare n-eps2 UFix) (define n-eps2 6)
+  (declare n-m1 UFix) (define n-m1 7)
+  (declare n-m3 UFix) (define n-m3 8)
+  (declare n-e0 UFix) (define n-e0 9)
+  (declare n-d UFix) (define n-d 10)
+  (declare n-ed UFix) (define n-ed 11)
+  (declare n-s UFix) (define n-s 12)
+  (declare n-es UFix) (define n-es 13)
+  (declare n-acc UFix) (define n-acc 14)
+  (declare n-ea UFix) (define n-ea 15)
+  (declare n-g UFix) (define n-g 16)
+  (declare n-eg UFix) (define n-eg 17)
+  (declare n-w UFix) (define n-w 18)
+  (declare n-ew UFix) (define n-ew 19)
+  (declare n-upper UFix) (define n-upper 20)
+  (declare n-best-t UFix) (define n-best-t 21)
+  (declare n-best-d UFix) (define n-best-d 22)
+  (declare n-best-e UFix) (define n-best-e 23)
+  (declare n-second UFix) (define n-second 24)
+  (declare n-loose UFix) (define n-loose 25)
+  (declare n-prev-hi UFix) (define n-prev-hi 26)
+  (declare n-step UFix) (define n-step 27)
+  (declare n-tie UFix) (define n-tie 28)
+  (declare n-g-lo UFix) (define n-g-lo 29)
+  (declare n-eg-lo UFix) (define n-eg-lo 30)
+  (declare n-d-lo UFix) (define n-d-lo 31)
+  (declare n-ed-lo UFix) (define n-ed-lo 32)
+  (declare n-left UFix) (define n-left 33)
+  (declare n-right UFix) (define n-right 34)
+  (declare n-t UFix) (define n-t 35)
+  (declare n-last UFix) (define n-last 36)
+  (declare n-one UFix) (define n-one 37)
+  (declare n-two UFix) (define n-two 38)
+  (declare n-three UFix) (define n-three 39)
+  (declare n-count UFix) (define n-count 40)
+  (declare n-best-floor UFix) (define n-best-floor 41)
+
+  (declare s-have UFix) (define s-have 0)
+  (declare s-prev-convex UFix) (define s-prev-convex 1)
+  (declare s-prev-best UFix) (define s-prev-best 2)
+  (declare s-top UFix) (define s-top 3)
+  (declare s-base UFix) (define s-base 4)
+  (declare s-count UFix) (define s-count 5)
+
+  (declare kept-up F64)
+  (define kept-up
+    "1 + 2^-40: what a sum of terms that are not negative is multiplied by before it is compared."
+    (lisp (-> F64) () (cl:+ 1d0 (cl:scale-float 1d0 -40))))
+  (declare kept-down F64)
+  (define kept-down
+    "1 - 2^-40: what a lower bound formed by a subtraction is multiplied by."
+    (lisp (-> F64) () (cl:- 1d0 (cl:scale-float 1d0 -40))))
+  (declare margin F64)
+  (define margin (lisp (-> F64) () (cl:scale-float 1d0 -40)))
+  (declare last-place F64)
+  (define last-place (lisp (-> F64) () (cl:scale-float 1d0 -52)))
+  (declare tiny F64)
+  (define tiny
+    "2^-1060: added to a bound formed from products, of which any one that underflows loses less than 2^-1074."
+    (lisp (-> F64) () (cl:scale-float 1d0 -1060)))
+  (declare small F64)
+  (define small
+    "2^-1030: carried at each level by the sums that bound the third differences, so that 2^-40 of them covers what an underflow lost at that level and every division after it."
+    (lisp (-> F64) () (cl:scale-float 1d0 -1030)))
+  (declare unit-roundoff F64)
+  (define unit-roundoff (lisp (-> F64) () (cl:scale-float 1d0 -53)))
+  (declare least-positive F64)
+  (define least-positive (lisp (-> F64) () cl:least-positive-double-float))
+  (declare infinity F64)
+  (define infinity (lisp (-> F64) () sb-ext:double-float-positive-infinity))
+  (declare not-a-number F64)
+  (define not-a-number (lisp (-> F64) () (sb-kernel:make-double-float #x7FF80000 0)))
+
+  (inline)
+  (declare count->float (UFix -> F64))
+  (define (count->float count)
+    "A count as a floating-point number; exact below 2^53."
+    (lisp (-> F64) (count) (cl:coerce count 'cl:double-float)))
+
+  (inline)
+  (declare whole-points (UFix * UFix -> UFix))
+  (define (whole-points entries dimension)
+    "How many points an array of this many entries holds, or one more than the entries where they do not divide."
+    (lisp (-> UFix) (entries dimension)
+      (cl:multiple-value-bind (quotient remainder) (cl:floor entries dimension)
+        (cl:if (cl:zerop remainder) quotient (cl:1+ entries)))))
+
+  (inline)
+  (declare product? (UFix * UFix * UFix -> Boolean))
+  (define (product? entries first second)
+    "Whether the entries are the product of the two, formed in integers of any size."
+    (lisp (-> Boolean) (entries first second) (cl:= entries (cl:* first second))))
+
+  ;; ---- Making a search ----------------------------------------------------------------------
+
+  (declare make-search (basis:Basis * UFix * UFix * UFix -> Search))
+  (define (make-search handle dimension depth budget)
+    "A search for curves on this basis in this dimension, which in looking for one point may halve an interval of the curve depth times and may look at budget intervals in all. Every workspace is allocated here. A basis the search cannot be made for is a SearchError: see docs/spline-nearest.md."
+    (let p = (basis:degree handle))
+    (let knots = (basis:knots handle))
+    (let count = (arr:length knots))
+    (let controls = (basis:control-count handle))
+    (when (< p 2)
+      (throw (DegreeBelowTwo p)))
+    (when (< (basis:highest-order handle) 2)
+      (throw (OrderBelowTwo (basis:highest-order handle))))
+    (when (or (== dimension 0) (> dimension 256))
+      (throw (BadDimension dimension)))
+    ;; A run of p equal knots strictly inside the domain.
+    (for ((i 0 (+ i 1))) :while (< (+ i (- p 1)) count)
+      (when (and (== (arr:aref knots i) (arr:aref knots (+ i (- p 1))))
+                 (and (> (arr:aref knots i) (arr:aref knots p))
+                      (< (arr:aref knots i) (arr:aref knots controls))))
+        (throw (KnotTooRepeated i))))
+    (let width = (+ p 1))
+    (let num = (arr:make 42 0.0d0))
+    (let wone = (arr:make count 0.0d0))
+    (let wtwo = (arr:make count 0.0d0))
+    (let degree = (count->float p))
+    ;; W1 and W2 of each span, from the least knot differences its control points see.
+    (for ((s p (+ s 1))) :while (< s controls)
+      (when (< (arr:aref knots s) (arr:aref knots (+ s 1)))
+        (arr:set! num n-one infinity)
+        (arr:set! num n-two infinity)
+        (for ((j (- (+ s 1) p) (+ j 1))) :while (<= j s)
+          (let across = (- (arr:aref knots (+ j p)) (arr:aref knots j)))
+          (when (< across (arr:aref num n-one))
+            (arr:set! num n-one across)))
+        (for ((j (- (+ s 2) p) (+ j 1))) :while (<= j s)
+          (let across = (- (arr:aref knots (+ j (- p 1))) (arr:aref knots j)))
+          (when (< across (arr:aref num n-two))
+            (arr:set! num n-two across)))
+        (arr:set! wone s (/ (* 2.0d0 degree) (arr:aref num n-one)))
+        (arr:set! wtwo s (/ (* (* 4.0d0 degree) (- degree 1.0d0))
+                            (* (arr:aref num n-one) (arr:aref num n-two))))))
+    (let rounding = (* (count->float (+ (* 6 p) 2)) unit-roundoff))
+    (arr:set! num n-gamma (/ rounding (- 1.0d0 rounding)))
+    (arr:set! num n-tau (* (count->float (* (* width width) (+ p 2))) least-positive))
+    (MkSearch (SearchStorage handle dimension depth budget p wone wtwo
+                             (arr:make count 0.0d0) (arr:make count 0.0d0)
+                             (arr:make width 0.0d0) (arr:make dimension 0.0d0)
+                             (arr:make (* 2 width) 0.0d0) (arr:make (* 2 dimension) 0.0d0)
+                             (arr:make (* 3 width) 0.0d0) (arr:make (* 3 dimension) 0.0d0)
+                             (arr:make dimension 0.0d0) (arr:make (* 2 dimension) 0.0d0)
+                             (arr:make (+ depth 2) 0.0d0) (arr:make (+ depth 2) 0.0d0)
+                             (arr:make (+ depth 2) (the UFix 0))
+                             num (arr:make 6 (the UFix 0)))))
+
+  (declare search-dimension (Search -> UFix))
+  (define (search-dimension search)
+    "The dimension this search was made for."
+    (.dim (storage search)))
+
+  (declare search-depth (Search -> UFix))
+  (define (search-depth search)
+    "How many times this search may halve one interval of the curve in looking for one point."
+    (.limit (storage search)))
+
+  (declare search-budget (Search -> UFix))
+  (define (search-budget search)
+    "How many intervals of the curve this search may look at for one point."
+    (.budget (storage search)))
+
+  ;; ---- What is known of a whole span, from the control points of this call -------------------
+
+  (inline)
+  (declare first-difference (SearchStorage * arr:LispArray F64 * UFix * UFix -> F64))
+  (define (first-difference store controls j c)
+    "Coordinate c of the control point of the derivative numbered j."
+    (let knots = (basis:knots (.handle store)))
+    (let p = (.p store))
+    (let d = (.dim store))
+    (/ (* (count->float p) (- (arr:aref controls (+ (* j d) c)) (arr:aref controls (+ (* (- j 1) d) c))))
+       (- (arr:aref knots (+ j p)) (arr:aref knots j))))
+
+  (inline)
+  (declare first-sum (SearchStorage * arr:LispArray F64 * UFix * UFix -> F64))
+  (define (first-sum store controls j c)
+    "The same with the difference made a sum of magnitudes, and what an underflow could lose."
+    (let knots = (basis:knots (.handle store)))
+    (let p = (.p store))
+    (let d = (.dim store))
+    (+ (/ (* (count->float p) (+ (abs (arr:aref controls (+ (* j d) c))) (abs (arr:aref controls (+ (* (- j 1) d) c)))))
+          (- (arr:aref knots (+ j p)) (arr:aref knots j)))
+       small))
+
+  (inline)
+  (declare second-difference (SearchStorage * arr:LispArray F64 * UFix * UFix -> F64))
+  (define (second-difference store controls j c)
+    "Coordinate c of the control point of the second derivative numbered j."
+    (let knots = (basis:knots (.handle store)))
+    (let p = (.p store))
+    (/ (* (count->float (- p 1)) (- (first-difference store controls j c) (first-difference store controls (- j 1) c)))
+       (- (arr:aref knots (+ j (- p 1))) (arr:aref knots j))))
+
+  (inline)
+  (declare second-sum (SearchStorage * arr:LispArray F64 * UFix * UFix -> F64))
+  (define (second-sum store controls j c)
+    (let knots = (basis:knots (.handle store)))
+    (let p = (.p store))
+    (+ (/ (* (count->float (- p 1)) (+ (first-sum store controls j c) (first-sum store controls (- j 1) c)))
+          (- (arr:aref knots (+ j (- p 1))) (arr:aref knots j)))
+       small))
+
+  (declare vector-length! (arr:LispArray F64 * UFix * UFix * arr:LispArray F64 * UFix -> Void))
+  (define (vector-length! values base count num slot)
+    "Write into num[slot] the length of the count entries of values from base, scaled by the largest so that no square leaves the range."
+    (arr:set! num n-one 0.0d0)
+    (for ((c 0 (+ c 1))) :while (< c count)
+      (when (> (abs (arr:aref values (+ base c))) (arr:aref num n-one))
+        (arr:set! num n-one (abs (arr:aref values (+ base c))))))
+    (when (== (arr:aref num n-one) 0.0d0)
+      (arr:set! num slot 0.0d0)
+      (return (values)))
+    (arr:set! num n-two 0.0d0)
+    (for ((c 0 (+ c 1))) :while (< c count)
+      (let ratio = (/ (arr:aref values (+ base c)) (arr:aref num n-one)))
+      (arr:set! num n-two (+ (arr:aref num n-two) (* ratio ratio))))
+    (arr:set! num slot (* (arr:aref num n-one) (math:sqrt (arr:aref num n-two)))))
+
+  (declare span-bounds! (SearchStorage * arr:LispArray F64 -> Void))
+  (define (span-bounds! store controls)
+    "For every span, M1 and M3 of the derivation: the largest control point of the derivative, and of the third derivative with what its differences can have lost."
+    (let knots = (basis:knots (.handle store)))
+    (let p = (.p store))
+    (let d = (.dim store))
+    (let num = (.num store))
+    (let vec = (.vec store))
+    (let limit = (basis:control-count (.handle store)))
+    (for ((s p (+ s 1))) :while (< s limit)
+      (when (< (arr:aref knots s) (arr:aref knots (+ s 1)))
+        (arr:set! (.mone store) s 0.0d0)
+        (for ((j (- (+ s 1) p) (+ j 1))) :while (<= j s)
+          (for ((c 0 (+ c 1))) :while (< c d)
+            (arr:set! vec c (first-difference store controls j c)))
+          (vector-length! vec 0 d num n-three)
+          (when (> (arr:aref num n-three) (arr:aref (.mone store) s))
+            (arr:set! (.mone store) s (arr:aref num n-three))))
+        (arr:set! (.mone store) s (+ (arr:aref (.mone store) s) tiny))
+        (arr:set! (.mthree store) s 0.0d0)
+        (when (>= p 3)
+          (arr:set! num n-count 0.0d0)
+          (for ((j (- (+ s 3) p) (+ j 1))) :while (<= j s)
+            (let across = (- (arr:aref knots (+ j (- p 2))) (arr:aref knots j)))
+            (let scale = (count->float (- p 2)))
+            (for ((c 0 (+ c 1))) :while (< c d)
+              (arr:set! vec c (/ (* scale (- (second-difference store controls j c)
+                                             (second-difference store controls (- j 1) c)))
+                                 across))
+              (arr:set! vec (+ d c) (+ (/ (* scale (+ (second-sum store controls j c)
+                                                      (second-sum store controls (- j 1) c)))
+                                          across)
+                                       small)))
+            (vector-length! vec 0 d num n-three)
+            (when (> (arr:aref num n-three) (arr:aref (.mthree store) s))
+              (arr:set! (.mthree store) s (arr:aref num n-three)))
+            (vector-length! vec d d num n-three)
+            (when (> (arr:aref num n-three) (arr:aref num n-count))
+              (arr:set! num n-count (arr:aref num n-three))))
+          (arr:set! (.mthree store) s (+ (arr:aref (.mthree store) s) (* margin (arr:aref num n-count))))))))
+
+  ;; ---- What is computed at a parameter, with its error ----------------------------------------
+
+  (declare probe! (SearchStorage * arr:LispArray F64 * arr:LispArray F64 * F64 * UFix -> Boolean))
+  (define (probe! store controls points parameter order)
+    "Evaluate the curve at the parameter to this order, 0, 1 or 2, and put into their slots the distance from the point this search is on, and for an order above 0 the speed and the residual, and for order 2 the length of the second derivative and w, each with its error. The errors are those of the span the evaluation was made on. False when the curve cannot be evaluated there or the distance is not finite."
+    (let num = (.num store))
+    (let d = (.dim store))
+    (let base = (arr:aref (.state store) s-base))
+    (let out = (cond ((== order 0) (.out0 store)) ((== order 1) (.out1 store)) (True (.out2 store))))
+    (let rows = (cond ((== order 0) (.rows0 store)) ((== order 1) (.rows1 store)) (True (.rows2 store))))
+    (unless (== (curve:evaluate! (.handle store) controls d parameter order rows out) basis:BasisSuccess)
+      (return False))
+    (let e0 = (arr:aref num n-e0))
+    (let delta = (.delta store))
+    (for ((c 0 (+ c 1))) :while (< c d)
+      (arr:set! delta c (- (arr:aref out c) (arr:aref points (+ base c)))))
+    (vector-length! delta 0 d num n-d)
+    (let dimension = (count->float d))
+    (arr:set! num n-ed (+ (* dimension e0) (* margin (arr:aref num n-d))))
+    (when (== order 0)
+      (return (inline (math:finite? (arr:aref num n-d)))))
+    ;; eps1 and eps2 of the derivation, for the span the basis took the parameter to be on.
+    (let used = (basis:latest-span (.handle store)))
+    (let a = (arr:aref num n-a))
+    (let tau = (arr:aref num n-tau))
+    (let relative = (* (+ (arr:aref num n-gamma) tau) a))
+    (let floor = (* tau (+ (* a (+ (arr:aref (.wone store) used) 1.0d0)) 1.0d0)))
+    (let eps1 = (+ (* relative (arr:aref (.wone store) used)) floor))
+    (vector-length! out d d num n-s)
+    (arr:set! num n-es (+ (* dimension eps1) (* margin (arr:aref num n-s))))
+    ;; The residual, with the sums of magnitudes its error bound takes.
+    (arr:set! num n-g 0.0d0)
+    (arr:set! num n-one 0.0d0)
+    (arr:set! num n-two 0.0d0)
+    (arr:set! num n-three 0.0d0)
+    (for ((c 0 (+ c 1))) :while (< c d)
+      (let product = (* (arr:aref delta c) (arr:aref out (+ d c))))
+      (arr:set! num n-g (+ (arr:aref num n-g) product))
+      (arr:set! num n-one (+ (arr:aref num n-one) (abs (arr:aref delta c))))
+      (arr:set! num n-two (+ (arr:aref num n-two) (abs (arr:aref out (+ d c)))))
+      (arr:set! num n-three (+ (arr:aref num n-three) (abs product))))
+    (arr:set! num n-eg (+ (+ (+ (* eps1 (arr:aref num n-one)) (* e0 (arr:aref num n-two)))
+                             (+ (* (* dimension e0) eps1) (* margin (arr:aref num n-three))))
+                          (* dimension tiny)))
+    (when (== order 1)
+      (return (inline (math:finite? (arr:aref num n-d)))))
+    (let eps2 = (+ (* relative (arr:aref (.wtwo store) used)) floor))
+    (let delta-sum = (arr:aref num n-one))
+    (vector-length! out (* 2 d) d num n-acc)
+    (arr:set! num n-ea (+ (* dimension eps2) (* margin (arr:aref num n-acc))))
+    (arr:set! num n-w 0.0d0)
+    (arr:set! num n-two 0.0d0)
+    (arr:set! num n-three 0.0d0)
+    (for ((c 0 (+ c 1))) :while (< c d)
+      (let product = (* (arr:aref delta c) (arr:aref out (+ (* 2 d) c))))
+      (arr:set! num n-w (+ (arr:aref num n-w) product))
+      (arr:set! num n-two (+ (arr:aref num n-two) (abs (arr:aref out (+ (* 2 d) c)))))
+      (arr:set! num n-three (+ (arr:aref num n-three) (abs product))))
+    (arr:set! num n-ew (+ (+ (+ (* eps2 delta-sum) (* e0 (arr:aref num n-two)))
+                             (+ (* (* dimension e0) eps2) (* margin (arr:aref num n-three))))
+                          (* dimension tiny)))
+    (inline (math:finite? (arr:aref num n-d))))
+
+  (inline)
+  (declare lower-upper! (arr:LispArray F64 -> Void))
+  (define (lower-upper! num)
+    "The nearest point is no farther than the distance just computed with its error."
+    (let reached = (+ (arr:aref num n-d) (arr:aref num n-ed)))
+    (when (< reached (arr:aref num n-upper))
+      (arr:set! num n-upper reached)))
+
+  ;; ---- Candidates ---------------------------------------------------------------------------
+
+  (inline)
+  (declare end-floor (F64 * F64 -> F64))
+  (define (end-floor distance slack)
+    "A lower bound of the distance at a parameter, from the distance computed there and its error."
+    (if (> distance slack) (* (- distance slack) kept-down) 0.0d0))
+
+  (inline)
+  (declare least-floor (F64 * F64 * F64 * F64 * F64 -> F64))
+  (define (least-floor distance slack residual bound curvature)
+    "A lower bound of the distance at the least point of an interval on which the squared distance is convex, from any parameter of it: the distance and the residual computed there with their errors, and a lower bound, above zero, of the derivative of the residual over the interval. Half the squared distance lies above its tangent parabola of that curvature, whose least value is the half square less the squared residual over twice the curvature."
+    (let low = (end-floor distance slack))
+    (let reach = (+ (abs residual) bound))
+    (let drop = (+ (* (/ (* reach reach) curvature) kept-up) tiny))
+    (let square = (* low low))
+    (if (> square drop) (* (math:sqrt (- square drop)) kept-down) 0.0d0))
+
+  (declare candidate! (SearchStorage * F64 * F64 * F64 * F64 * Boolean * F64 * F64 -> Void))
+  (define (candidate! store parameter distance slack floor convex low high)
+    "A least point of the distance on an interval from low to high, as a parameter at or near it: the distance computed at that parameter with its error, and a lower bound of the distance at the least point itself. Keep the nearest, and the least that any other could be. A candidate of a convex interval that begins where the convex interval of the one before ended is the same least point, and is not another."
+    (let num = (.num store))
+    (let state = (.state store))
+    (let same = (and convex (and (== (arr:aref state s-prev-convex) 1) (== low (arr:aref num n-prev-hi)))))
+    (let nearer = (< distance (arr:aref num n-best-d)))
+    (let first = (== (arr:aref state s-have) 0))
+    (let merged = (and same (== (arr:aref state s-prev-best) 1)))
+    ;; What the candidate that is not kept could be at the least: a second answer.
+    (let other = (if nearer (arr:aref num n-best-floor) floor))
+    (when (and (not first) (and (not merged) (< other (arr:aref num n-second))))
+      (arr:set! num n-second other))
+    (cond
+      ((or first nearer)
+       (arr:set! num n-best-t parameter)
+       (arr:set! num n-best-d distance)
+       (arr:set! num n-best-e slack)
+       (arr:set! num n-best-floor floor)
+       (arr:set! state s-prev-best 1))
+      (merged (arr:set! state s-prev-best 1))
+      (True (arr:set! state s-prev-best 0)))
+    (arr:set! state s-have 1)
+    (arr:set! num n-prev-hi high)
+    (arr:set! state s-prev-convex (if convex 1 0)))
+
+  ;; ---- A foot between two ends --------------------------------------------------------------
+
+  (declare bracketed! (SearchStorage * arr:LispArray F64 * arr:LispArray F64 * F64 * F64 -> Boolean))
+  (define (bracketed! store controls points low high)
+    "Find the foot of a convex interval whose residual is shown below zero at low and above zero at high, and leave it in the slot of the parameter with its distance and error in theirs. False when it could not be found: the interval is then left unresolved."
+    (let num = (.num store))
+    (let step = (arr:aref num n-step))
+    (arr:set! num n-left low)
+    (arr:set! num n-right high)
+    (arr:set! num n-t (+ low (* 0.5d0 (- high low))))
+    (arr:set! num n-last (- high low))
+    (for ((pass 0 (+ pass 1))) :while (< pass 4096)
+      (let at = (arr:aref num n-t))
+      (unless (probe! store controls points at 2)
+        (return False))
+      (lower-upper! num)
+      (let g = (arr:aref num n-g))
+      ;; The residual is zero to within its bound: as narrow as the arithmetic can make it.
+      (when (<= (abs g) (arr:aref num n-eg))
+        (return True))
+      (cond
+        ((< g 0.0d0) (arr:set! num n-left at))
+        (True (arr:set! num n-right at)))
+      (let left = (arr:aref num n-left))
+      (let right = (arr:aref num n-right))
+      (let middle = (+ left (* 0.5d0 (- right left))))
+      (when (or (<= (- right left) step) (not (and (< left middle) (< middle right))))
+        (return True))
+      ;; Newton's step, taken where it is at most half the step before and lands strictly inside
+      ;; the bracket; a step shorter than a quarter of the tolerance is carried half of the
+      ;; tolerance further, so that it lands on the far side of the foot and closes the bracket.
+      (let speed = (arr:aref num n-s))
+      (let h = (+ (* speed speed) (arr:aref num n-w)))
+      (let move = (- 0.0d0 (/ g h)))
+      (let carried = (cond
+                       ((> (abs move) (* 0.25d0 step)) move)
+                       ((< move 0.0d0) (- move (* 0.5d0 step)))
+                       (True (+ move (* 0.5d0 step)))))
+      (let target = (+ at carried))
+      (cond
+        ((and (> h 0.0d0)
+              (and (<= (abs move) (* 0.5d0 (arr:aref num n-last)))
+                   (and (< left target) (< target right))))
+         (arr:set! num n-last (abs move))
+         (arr:set! num n-t target))
+        (True
+         (arr:set! num n-last (- right left))
+         (arr:set! num n-t middle))))
+    False)
+
+  ;; ---- One interval -------------------------------------------------------------------------
+
+  (declare push! (SearchStorage * F64 * F64 * UFix -> Void))
+  (define (push! store low high level)
+    (let state = (.state store))
+    (let top = (arr:aref state s-top))
+    (arr:set! (.slo store) top low)
+    (arr:set! (.shi store) top high)
+    (arr:set! (.slevel store) top level)
+    (arr:set! state s-top (+ top 1)))
+
+  (inline)
+  (declare loosen! (arr:LispArray F64 * F64 -> Void))
+  (define (loosen! num bound)
+    "An interval is left unresolved with this lower bound of the distance over it."
+    (when (< bound (arr:aref num n-loose))
+      (arr:set! num n-loose bound)))
+
+  (declare convex! (SearchStorage * arr:LispArray F64 * arr:LispArray F64 * F64 * F64 * F64 -> Void))
+  (define (convex! store controls points low high curvature)
+    "An interval on which the squared distance is convex holds one least point. The residuals at its two ends say where. curvature is a lower bound, above zero, of the derivative of the residual over the interval."
+    (let num = (.num store))
+    (let knots = (basis:knots (.handle store)))
+    (let start = (arr:aref knots (.p store)))
+    (let end = (arr:aref knots (basis:control-count (.handle store))))
+    (unless (probe! store controls points low 1)
+      (loosen! num 0.0d0)
+      (return (values)))
+    (lower-upper! num)
+    (arr:set! num n-g-lo (arr:aref num n-g))
+    (arr:set! num n-eg-lo (arr:aref num n-eg))
+    (arr:set! num n-d-lo (arr:aref num n-d))
+    (arr:set! num n-ed-lo (arr:aref num n-ed))
+    (unless (probe! store controls points high 1)
+      (loosen! num 0.0d0)
+      (return (values)))
+    (lower-upper! num)
+    (let g-lo = (arr:aref num n-g-lo))
+    (let eg-lo = (arr:aref num n-eg-lo))
+    (let g-hi = (arr:aref num n-g))
+    (let eg-hi = (arr:aref num n-eg))
+    (cond
+      ;; The residual is above zero at the left end: the least point of the interval is that end,
+      ;; which is a least point of the curve only where it is the start of the domain.
+      ((> g-lo eg-lo)
+       (when (== low start)
+         (candidate! store low (arr:aref num n-d-lo) (arr:aref num n-ed-lo)
+                     (end-floor (arr:aref num n-d-lo) (arr:aref num n-ed-lo)) True low high)))
+      ((< g-hi (- 0.0d0 eg-hi))
+       (when (== high end)
+         (candidate! store high (arr:aref num n-d) (arr:aref num n-ed)
+                     (end-floor (arr:aref num n-d) (arr:aref num n-ed)) True low high)))
+      ;; Below zero at the left and above at the right: a foot strictly between.
+      ((and (< g-lo (- 0.0d0 eg-lo)) (> g-hi eg-hi))
+       (cond
+         ((bracketed! store controls points low high)
+          (candidate! store (arr:aref num n-t) (arr:aref num n-d) (arr:aref num n-ed)
+                      (least-floor (arr:aref num n-d) (arr:aref num n-ed) (arr:aref num n-g) (arr:aref num n-eg)
+                                   curvature)
+                      True low high))
+         (True (loosen! num 0.0d0))))
+      ;; The residual at an end is zero to within its bound; at both, the nearer end.
+      ((and (<= (abs g-lo) eg-lo) (or (> (abs g-hi) eg-hi) (<= (arr:aref num n-d-lo) (arr:aref num n-d))))
+       (candidate! store low (arr:aref num n-d-lo) (arr:aref num n-ed-lo)
+                   (least-floor (arr:aref num n-d-lo) (arr:aref num n-ed-lo) g-lo eg-lo curvature) True low high))
+      (True
+       (candidate! store high (arr:aref num n-d) (arr:aref num n-ed)
+                   (least-floor (arr:aref num n-d) (arr:aref num n-ed) g-hi eg-hi curvature) True low high))))
+
+  (declare interval! (SearchStorage * arr:LispArray F64 * arr:LispArray F64 * F64 * F64 * UFix -> Void))
+  (define (interval! store controls points low high level)
+    "Look at one interval of a span through its middle, by the four tests of the derivation in their order."
+    (let num = (.num store))
+    (let knots = (basis:knots (.handle store)))
+    (let start = (arr:aref knots (.p store)))
+    (let end = (arr:aref knots (basis:control-count (.handle store))))
+    (let middle = (+ low (* 0.5d0 (- high low))))
+    ;; An interval too narrow to have a middle of its own, or one the curve cannot be evaluated
+    ;; inside: unresolved, with no bound on what it holds.
+    (unless (and (< low middle) (< middle high))
+      (loosen! num 0.0d0)
+      (return (values)))
+    (unless (probe! store controls points middle 2)
+      (loosen! num 0.0d0)
+      (return (values)))
+    (lower-upper! num)
+    (let r = (max (- middle low) (- high middle)))
+    (let d = (arr:aref num n-d))
+    (let ed = (arr:aref num n-ed))
+    (let m1 = (arr:aref num n-m1))
+    (let m3 = (arr:aref num n-m3))
+    (let reach = (+ (+ ed (* m1 r)) tiny))
+    ;; 1. Set aside by distance.
+    (when (> d (* (+ (+ (arr:aref num n-upper) (arr:aref num n-tie)) reach) kept-up))
+      (return (values)))
+    (let g = (arr:aref num n-g))
+    (let eg = (arr:aref num n-eg))
+    (let s = (arr:aref num n-s))
+    (let es = (arr:aref num n-es))
+    (let w = (arr:aref num n-w))
+    (let ew = (arr:aref num n-ew))
+    (let k2 = (+ (+ (+ (arr:aref num n-acc) (arr:aref num n-ea)) (* m3 r)) tiny))
+    (let s-up = (+ (+ (+ s es) (* k2 r)) tiny))
+    (let d-up = (+ d reach))
+    (let h-up = (+ (+ (* s-up s-up) (* d-up k2)) tiny))
+    (let drift = (* (+ (+ eg (* h-up r)) tiny) kept-up))
+    ;; 2. Rising or falling: no least point inside, and one at an end only if it is the domain's.
+    (when (> g drift)
+      (when (== low start)
+        (when (probe! store controls points low 1)
+          (lower-upper! num)
+          (candidate! store low (arr:aref num n-d) (arr:aref num n-ed)
+                      (end-floor (arr:aref num n-d) (arr:aref num n-ed)) False low high)))
+      (return (values)))
+    (when (> (- 0.0d0 g) drift)
+      (when (== high end)
+        (when (probe! store controls points high 1)
+          (lower-upper! num)
+          (candidate! store high (arr:aref num n-d) (arr:aref num n-ed)
+                      (end-floor (arr:aref num n-d) (arr:aref num n-ed)) False low high)))
+      (return (values)))
+    ;; 3. Convex: the lower bound of h is above zero.
+    (let slack = (+ (+ es (* k2 r)) tiny))
+    (let s-low = (if (> s slack) (* (- s slack) kept-down) 0.0d0))
+    (let gain = (* (+ (* s-low s-low) (max w 0.0d0)) kept-down))
+    (let loss = (* (+ (+ (+ (max (- 0.0d0 w) 0.0d0) ew) (+ (* (* m1 r) k2) (* (* (+ d ed) m3) r))) tiny) kept-up))
+    (when (> gain loss)
+      (convex! store controls points low high (- gain loss))
+      (return (values)))
+    ;; 4. Halved, or left unresolved with the lower bound of the distance over it.
+    (cond
+      ((< level (.limit store))
+       (push! store middle high (+ level 1))
+       (push! store low middle (+ level 1)))
+      ((> d (* reach kept-up))
+       (loosen! num (* (- d (* reach kept-up)) kept-down)))
+      (True (loosen! num 0.0d0))))
+
+  (declare next-interval! (SearchStorage * arr:LispArray F64 * arr:LispArray F64 -> Void))
+  (define (next-interval! store controls points)
+    "Take the interval on top of the stack and look at it."
+    (let state = (.state store))
+    (let top = (- (arr:aref state s-top) 1))
+    (arr:set! state s-top top)
+    (arr:set! state s-count (+ (arr:aref state s-count) 1))
+    (interval! store controls points (arr:aref (.slo store) top) (arr:aref (.shi store) top)
+               (arr:aref (.slevel store) top)))
+
+  ;; ---- One point ----------------------------------------------------------------------------
+
+  (declare one-point! (SearchStorage * arr:LispArray F64 * arr:LispArray F64 * arr:LispArray F64 * UFix
+                       * arr:LispArray F64 * arr:LispArray UFix * arr:LispArray F64 -> Void))
+  (define (one-point! store controls points hints i feet reports measures)
+    "Search the whole curve for the point numbered i and write its parameter, its report and its four measures."
+    (let num = (.num store))
+    (let state = (.state store))
+    (let knots = (basis:knots (.handle store)))
+    (let p = (.p store))
+    (let d = (.dim store))
+    (let limit = (basis:control-count (.handle store)))
+    (let start = (arr:aref knots p))
+    (let end = (arr:aref knots limit))
+    (arr:set! state s-base (* i d))
+    (arr:set! state s-have 0)
+    (arr:set! state s-prev-convex 0)
+    (arr:set! state s-prev-best 0)
+    (arr:set! state s-count 0)
+    (arr:set! num n-upper infinity)
+    (arr:set! num n-best-d infinity)
+    (arr:set! num n-second infinity)
+    (arr:set! num n-loose infinity)
+    ;; B, and the error of a coordinate of the point of the curve less the point.
+    (arr:set! num n-b 0.0d0)
+    (for ((c 0 (+ c 1))) :while (< c d)
+      (when (> (abs (arr:aref points (+ (* i d) c))) (arr:aref num n-b))
+        (arr:set! num n-b (abs (arr:aref points (+ (* i d) c))))))
+    (arr:set! num n-e0 (+ (arr:aref num n-eps0) (* last-place (+ (arr:aref num n-a) (arr:aref num n-b)))))
+    ;; A first upper bound of the least distance: the hint, or the middle of every span.
+    (cond
+      ((> (arr:length hints) 0)
+       (when (and (>= (arr:aref hints i) start) (<= (arr:aref hints i) end))
+         (when (probe! store controls points (arr:aref hints i) 0)
+           (lower-upper! num))))
+      (True
+       (for ((s p (+ s 1))) :while (< s limit)
+         (when (< (arr:aref knots s) (arr:aref knots (+ s 1)))
+           (when (probe! store controls points
+                         (+ (arr:aref knots s) (* 0.5d0 (- (arr:aref knots (+ s 1)) (arr:aref knots s)))) 0)
+             (lower-upper! num))))))
+    ;; Every span in turn, its intervals in increasing order of the parameter.
+    (for ((s p (+ s 1))) :while (< s limit)
+      (when (< (arr:aref knots s) (arr:aref knots (+ s 1)))
+        (arr:set! num n-m1 (arr:aref (.mone store) s))
+        (arr:set! num n-m3 (arr:aref (.mthree store) s))
+        (arr:set! state s-top 0)
+        (push! store (arr:aref knots s) (arr:aref knots (+ s 1)) 0)
+        ;; With the budget spent, whatever is left is unresolved, with no bound on what it holds.
+        (for () :while (> (arr:aref state s-top) 0)
+          (cond
+            ((>= (arr:aref state s-count) (.budget store))
+             (loosen! num 0.0d0)
+             (arr:set! state s-top 0))
+            (True (next-interval! store controls points))))))
+    ;; The answer, or why there is none.
+    (let threshold = (* (+ (+ (arr:aref num n-best-d) (arr:aref num n-best-e)) (arr:aref num n-tie)) kept-up))
+    (let parameter = (arr:aref num n-best-t))
+    (when (or (== (arr:aref state s-have) 0)
+              (or (<= (arr:aref num n-loose) threshold)
+                  (not (probe! store controls points parameter 1))))
+      (arr:set! feet i not-a-number)
+      (arr:set! reports i report-unresolved)
+      (for ((k 0 (+ k 1))) :while (< k 4)
+        (arr:set! measures (+ (* 4 i) k) not-a-number))
+      (return (values)))
+    (arr:set! feet i parameter)
+    (arr:set! measures (* 4 i) (arr:aref num n-d))
+    (arr:set! measures (+ (* 4 i) 1) (arr:aref num n-g))
+    (arr:set! measures (+ (* 4 i) 2) (arr:aref num n-eg))
+    (arr:set! measures (+ (* 4 i) 3) (arr:aref num n-s))
+    (arr:set! reports i
+              (cond
+                ((<= (arr:aref num n-second) threshold) report-tied)
+                ((== parameter start) report-start)
+                ((== parameter end) report-end)
+                (True report-foot))))
+
+  ;; ---- The call -----------------------------------------------------------------------------
+
+  (declare all-finite? (arr:LispArray F64 -> Boolean))
+  (define (all-finite? values)
+    (for ((i 0 (+ i 1))) :while (< i (arr:length values))
+      (unless (inline (math:finite? (arr:aref values i)))
+        (return False)))
+    True)
+
+  (declare nearest! (Search * arr:LispArray F64 * arr:LispArray F64 * arr:LispArray F64 * F64 * F64
+                     * arr:LispArray F64 * arr:LispArray UFix * arr:LispArray F64 -> SearchStatus))
+  (define (nearest! search controls points hints step tie feet reports measures)
+    "For each point, of the search's dimension, the parameter of the curve with these control points that is nearest to it, of the whole curve: into feet, with a report of what kind of answer it is into reports, and into measures the distance, the residual, the bound on the residual's error and the speed. hints has no entry, or a parameter for each point that can only save work. step is a tolerance on the parameter and tie one on the distance, for reporting a second answer. A point left unresolved gets no parameter. Any status but SearchSuccess writes nothing. See docs/spline-nearest.md."
+    (let store = (storage search))
+    (let num = (.num store))
+    (let d = (.dim store))
+    (let knots = (basis:knots (.handle store)))
+    (when (or (unsafe-pointer-eq? feet measures)
+              (or (unsafe-pointer-eq? feet controls)
+                  (or (unsafe-pointer-eq? feet points)
+                      (or (unsafe-pointer-eq? feet hints)
+                          (or (unsafe-pointer-eq? feet knots)
+                              (or (unsafe-pointer-eq? measures controls)
+                                  (or (unsafe-pointer-eq? measures points)
+                                      (or (unsafe-pointer-eq? measures hints)
+                                          (unsafe-pointer-eq? measures knots)))))))))
+      (throw (basis:OutputAliased "An output of a search is one of its inputs, or its other output.")))
+    (let count = (whole-points (arr:length points) d))
+    (unless (and (product? (arr:length controls) (basis:control-count (.handle store)) d)
+                 (and (<= count (arr:length points))
+                      (and (or (== (arr:length hints) 0) (== (arr:length hints) count))
+                           (and (== (arr:length feet) count)
+                                (and (== (arr:length reports) count)
+                                     (product? (arr:length measures) count 4))))))
+      (return SearchBadSize))
+    (unless (and (and (>= step 0.0d0) (inline (math:finite? step)))
+                 (and (>= tie 0.0d0) (inline (math:finite? tie))))
+      (return SearchBadTolerance))
+    (unless (and (all-finite? controls) (and (all-finite? points) (all-finite? hints)))
+      (return SearchNonFinite))
+    (arr:set! num n-step step)
+    (arr:set! num n-tie tie)
+    ;; A, and the error of a coordinate of a point of the curve.
+    (arr:set! num n-a 0.0d0)
+    (for ((k 0 (+ k 1))) :while (< k (arr:length controls))
+      (when (> (abs (arr:aref controls k)) (arr:aref num n-a))
+        (arr:set! num n-a (abs (arr:aref controls k)))))
+    (let a = (arr:aref num n-a))
+    (let tau = (arr:aref num n-tau))
+    (arr:set! num n-eps0 (+ (* (+ (arr:aref num n-gamma) tau) a) (* tau (+ a 1.0d0))))
+    (span-bounds! store controls)
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (one-point! store controls points hints i feet reports measures))
+    SearchSuccess))

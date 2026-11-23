@@ -68,6 +68,16 @@ each planned batch expects to read; an entry here is the record that it did.
 | A curve as the combination of its control points by the basis functions, which is what the curve module computes, and its derivative by the derivatives of those functions | Prautzsch, Boehm and Paluszny, as above: section 5.4, p. 63, the linear combination the section opens with; section 5.6, p. 67 | Mathematics | As above | `src/spline/curve.ct` |
 | A point of a curve by repeated convex combination of its control points, and a derivative as the curve one degree lower on scaled differences of them: the two routes of the tests' exact reference | The same: section 5.4, p. 64, the affine combinations and their coefficient; section 5.6, p. 67, equation (1) | Mathematics | As above | `tests/spline-curve.lisp` |
 
+| That a segment of a curve lies in the convex hull of the control points of its span, and its derivative in the hull of its own: what the search's bounds over a whole span rest on | The same: section 5.7, p. 69, the property of the convex hull; section 5.6, p. 67, equation (1) | Mathematics | As above | `src/spline/nearest.ct` |
+| Sturm's count of the real roots of a polynomial in an interval, by which the tests' exact reference finds every least point of a distance | No text was read for it: it is used as a theorem of algebra, in the form of a chain of remainders with their signs changed, and the reference is checked on polynomials whose roots are known | A theorem, not a method read | | `tests/spline-nearest-reference.lisp` |
+
+**What the search adds to those, because no text was read for it.** The bounds over an
+interval, the four tests, the bracket with its Newton step, the lower bound of a least
+point's distance and the rule for a tie are derived in
+[the search's contract](spline-nearest.md#the-bounds-derived) from the hull property, the
+two contracts the module stands on, the mean value inequality and the convexity of a
+function whose second derivative is above zero.
+
 **What the first two entries do not cover, because no text was read for it.** The text
 gives the recurrence as a definition, not as a procedure. How the computation is arranged
 is this library's, worked out from that definition and from what the contract's error

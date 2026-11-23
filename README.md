@@ -2,9 +2,10 @@
 
 Geometry in [Coalton](https://github.com/coalton-lang/coalton), as a library of its own.
 
-**Status: two modules built.** B-spline basis functions, and the curves that are their
-combinations, with their derivatives, at a parameter or at a batch of parameters. Each has
-an error bound that every number it returns is tested against in exact arithmetic.
+**Status: three modules built.** B-spline basis functions; the curves that are their
+combinations, with their derivatives; and the parameter of a curve nearest to a point, of
+the whole curve and with a report where the curve offers two. Each has bounds that every
+answer is tested against in exact arithmetic.
 [The batch plan](docs/plan.md) has what follows and [the roadmap](ROADMAP.md) what each
 waits for.
 
@@ -12,6 +13,7 @@ waits for.
 | --- | --- | --- |
 | `coalton-geometry/spline/basis` | The basis functions of a knot vector that are not zero at a parameter, and their derivatives to any order, into caller-owned arrays | [docs/spline-basis.md](docs/spline-basis.md) |
 | `coalton-geometry/spline/curve` | A point of a curve in any dimension and its derivatives with respect to the parameter, with the basis rows that are its derivatives with respect to the control points | [docs/spline-curve.md](docs/spline-curve.md) |
+| `coalton-geometry/spline/nearest` | For a batch of points, the parameter of the curve nearest to each, shown to be the nearest of the whole curve, with a report of an end, a tie or an answer that could not be shown | [docs/spline-nearest.md](docs/spline-nearest.md) |
 
 It is the sister of [coalton-linalg](https://github.com/inmymoonsuit/coalton-linalg),
 numerical linear algebra in Coalton, and is built to the same rules: contracts written
@@ -38,12 +40,13 @@ reference.
 | `src/` | The modules, one package a file |
 | `tests/spline-basis.lisp`, `tests/spline-basis-callers.ct` | The basis module against its contract: an exact reference, every refusal, batches, allocation |
 | `tests/spline-curve.lisp`, `tests/spline-curve-callers.ct` | The curve module against its contract, the same way |
+| `tests/spline-nearest.lisp`, `tests/spline-nearest-callers.ct`, `tests/spline-nearest-reference.lisp` | The search against its promises, with an exact reference that isolates the roots of a polynomial in rationals |
 | `tests/representation-subject.ct`, `tests/representation-callers.ct`, `tests/representation.lisp` | How a point can be stored, measured on the pinned compiler; [the design notes](docs/design.md) rest on it |
 | `tests/aliasing.lisp`, `tests/scale-sweep.lisp` | The two [rosters](docs/rosters.md), which every exported call answers |
 | `scripts/`, `tools/`, `toolchain.lock.json` | The check runner, the pinned toolchain it verifies, and the runner for planted defects |
 | `tests/plants/` | Rosters of planted defects, one for each batch |
 | `CONTEXT.md` | [The library's mathematical conventions and terms](CONTEXT.md) |
-| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [reference texts](docs/references.md), [rosters](docs/rosters.md), the records of [the groundwork](docs/batch0.md), [batch 1](docs/batch1.md) and [batch 2](docs/batch2.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
+| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [reference texts](docs/references.md), [rosters](docs/rosters.md), the records of [the groundwork](docs/batch0.md), [batch 1](docs/batch1.md), [batch 2](docs/batch2.md) and [batch 3](docs/batch3.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
 
 ## Checking it
 
