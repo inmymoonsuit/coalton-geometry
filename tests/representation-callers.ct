@@ -1,0 +1,88 @@
+(cl:defpackage #:coalton-geometry/tests/representation-callers
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray)
+                    (#:subject #:coalton-geometry/tests/representation-subject))
+  (:export #:struct-loop #:inline-struct-loop #:array-loop #:scalar-loop #:inline-scalar-loop
+           #:store-loop #:make-points
+           #:opaque-struct-loop #:opaque-scalar-loop))
+(cl:in-package #:coalton-geometry/tests/representation-callers)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; The consumer's side of the measurement: each loop calls the other file's operations as a
+;;; caller of a library would, a given number of times, so that the test can count what a call
+;;; allocates.
+
+(coalton-toplevel
+  (declare struct-loop (arr:LispArray F64 * UFix -> Void))
+  (define (struct-loop coordinates count)
+    "count midpoints of the first two points, each through values of their own, written at the third point."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (let a = (subject:Point (arr:aref coordinates 0) (arr:aref coordinates 1)))
+      (let b = (subject:Point (arr:aref coordinates 2) (arr:aref coordinates 3)))
+      (let m = (subject:midpoint a b))
+      (arr:set! coordinates 4 (.x m))
+      (arr:set! coordinates 5 (.y m))))
+
+  (declare inline-struct-loop (arr:LispArray F64 * UFix -> Void))
+  (define (inline-struct-loop coordinates count)
+    "The same with the midpoint inlined."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (let a = (subject:Point (arr:aref coordinates 0) (arr:aref coordinates 1)))
+      (let b = (subject:Point (arr:aref coordinates 2) (arr:aref coordinates 3)))
+      (let m = (subject:inline-midpoint a b))
+      (arr:set! coordinates 4 (.x m))
+      (arr:set! coordinates 5 (.y m))))
+
+  (declare array-loop (arr:LispArray F64 * UFix -> Void))
+  (define (array-loop coordinates count)
+    "count midpoints of the first two points, written at the third, with no value but the array."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (subject:midpoint! coordinates 0 1 2)))
+
+  (declare scalar-loop (arr:LispArray F64 * UFix -> Void))
+  (define (scalar-loop coordinates count)
+    "count cross products of the first two points, each returned as a number, written at the fourth point."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (arr:set! coordinates 6
+                (subject:cross (arr:aref coordinates 0) (arr:aref coordinates 1)
+                       (arr:aref coordinates 2) (arr:aref coordinates 3)))))
+
+  (declare inline-scalar-loop (arr:LispArray F64 * UFix -> Void))
+  (define (inline-scalar-loop coordinates count)
+    "The same with the cross product inlined."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (arr:set! coordinates 6
+                (subject:inline-cross (arr:aref coordinates 0) (arr:aref coordinates 1)
+                              (arr:aref coordinates 2) (arr:aref coordinates 3)))))
+
+  (declare make-points (UFix -> arr:LispArray subject:Point))
+  (define (make-points count)
+    "An array of that many points, for store-loop to write into."
+    (arr:make count (subject:Point 0.0d0 0.0d0)))
+
+  (declare store-loop (arr:LispArray F64 * arr:LispArray subject:Point * UFix -> Void))
+  (define (store-loop coordinates points count)
+    "count midpoints, each kept: written as a value of its own into a slot of an array of points."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (let a = (subject:Point (arr:aref coordinates 0) (arr:aref coordinates 1)))
+      (let b = (subject:Point (arr:aref coordinates 2) (arr:aref coordinates 3)))
+      (arr:set! points 0 (subject:midpoint a b))))
+
+  (declare opaque-struct-loop (arr:LispArray (subject:Point * subject:Point -> subject:Point)
+                               * arr:LispArray F64 * UFix -> Void))
+  (define (opaque-struct-loop held coordinates count)
+    "count midpoints through a function known only by its type, each read and dropped."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (let a = (subject:Point (arr:aref coordinates 0) (arr:aref coordinates 1)))
+      (let b = (subject:Point (arr:aref coordinates 2) (arr:aref coordinates 3)))
+      (let m = ((arr:aref held 0) a b))
+      (arr:set! coordinates 4 (.x m))
+      (arr:set! coordinates 5 (.y m))))
+
+  (declare opaque-scalar-loop (arr:LispArray (F64 * F64 * F64 * F64 -> F64) * arr:LispArray F64 * UFix -> Void))
+  (define (opaque-scalar-loop held coordinates count)
+    "count cross products through a function known only by its type."
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (arr:set! coordinates 6
+                ((arr:aref held 0) (arr:aref coordinates 0) (arr:aref coordinates 1)
+                                   (arr:aref coordinates 2) (arr:aref coordinates 3))))))

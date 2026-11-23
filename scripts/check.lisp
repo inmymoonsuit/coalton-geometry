@@ -1,0 +1,12 @@
+(load (merge-pathnames "bootstrap.lisp" *load-truename*))
+(unless (null (find-package "COALTON-GEOMETRY/TESTS"))
+  (error "Loading the main library loaded its tests."))
+(format t "CORE-LOAD-ISOLATION-PASS~%")
+(load-refusing-warnings "coalton-geometry/tests")
+(load (merge-pathnames "tools/toolchain-metadata.lisp" *library-root*))
+(load (merge-pathnames "allocation-isolation.lisp" *load-truename*))
+(check-isolation-restoration)
+(call-with-allocation-isolation
+  (lambda ()
+    (asdf:test-system "coalton-geometry")))
+(coalton-geometry/toolchain:write-metadata (uiop:getenv "COALTON_GEOMETRY_METADATA"))

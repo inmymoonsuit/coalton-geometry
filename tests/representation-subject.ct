@@ -1,0 +1,62 @@
+(cl:defpackage #:coalton-geometry/tests/representation-subject
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray))
+  (:export #:Point #:midpoint #:inline-midpoint #:midpoint! #:cross #:inline-cross
+           #:held-midpoint #:held-cross))
+(cl:in-package #:coalton-geometry/tests/representation-subject)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; A measurement, not a module. This file stands where a library would: it defines a point and
+;;; a few operations on it, in the ways a geometry library could hold one. Its callers are in
+;;; another file and another package, as a consumer's are, because what a compiler can see
+;;; through inside one file says nothing about what a library costs to call.
+;;; docs/design.md has the question this answers. Nothing here is exported by the library.
+
+(coalton-toplevel
+  (define-struct Point
+    "A point of the plane as a value of its own."
+    (x F64)
+    (y F64))
+
+  (declare midpoint (Point * Point -> Point))
+  (define (midpoint a b)
+    "The midpoint as a new value."
+    (Point (* 0.5d0 (+ (.x a) (.x b))) (* 0.5d0 (+ (.y a) (.y b)))))
+
+  (inline)
+  (declare inline-midpoint (Point * Point -> Point))
+  (define (inline-midpoint a b)
+    "The same, inlined into its caller."
+    (Point (* 0.5d0 (+ (.x a) (.x b))) (* 0.5d0 (+ (.y a) (.y b)))))
+
+  (declare midpoint! (arr:LispArray F64 * UFix * UFix * UFix -> Void))
+  (define (midpoint! coordinates a b out)
+    "The midpoint of points a and b of an array holding two coordinates a point, written at point out."
+    (arr:set! coordinates (* 2 out)
+              (* 0.5d0 (+ (arr:aref coordinates (* 2 a)) (arr:aref coordinates (* 2 b)))))
+    (arr:set! coordinates (+ (* 2 out) 1)
+              (* 0.5d0 (+ (arr:aref coordinates (+ (* 2 a) 1)) (arr:aref coordinates (+ (* 2 b) 1))))))
+
+  (declare cross (F64 * F64 * F64 * F64 -> F64))
+  (define (cross ax ay bx by)
+    "The cross product of two vectors of the plane, returned as a number."
+    (- (* ax by) (* ay bx)))
+
+  (inline)
+  (declare inline-cross (F64 * F64 * F64 * F64 -> F64))
+  (define (inline-cross ax ay bx by)
+    "The same, inlined into its caller."
+    (- (* ax by) (* ay bx)))
+
+  ;; The compiler inlines a small function wherever it can name it, across files too. A larger
+  ;; routine is not inlined. To measure a call that is not seen into, the function is handed
+  ;; over inside an array, where its caller can know only its type.
+  (declare held-midpoint (UFix -> arr:LispArray (Point * Point -> Point)))
+  (define (held-midpoint count)
+    "An array holding midpoint that many times."
+    (arr:make count midpoint))
+
+  (declare held-cross (UFix -> arr:LispArray (F64 * F64 * F64 * F64 -> F64)))
+  (define (held-cross count)
+    "An array holding cross that many times."
+    (arr:make count cross)))
