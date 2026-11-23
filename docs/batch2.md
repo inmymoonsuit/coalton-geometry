@@ -2,7 +2,8 @@
 
 State: completed 2026-11-23; both complete checks pass at safety 1 and safety 0 on
 Windows x86-64, SBCL 2.6.10 and the pinned Coalton compiler. The library's first consumer
-signed the contract as written before any code; its review of the code is still to come.
+signed the contract as written before any code, and its own review of the code, with tests
+this library's author did not see, found no defect: [below](#the-consumers-review).
 
 ## What was built
 
@@ -127,6 +128,25 @@ sum before the family does; that is why two arithmetic plants are caught there f
    the contract: the basis reports one only where its own batch ran.
 
 Nothing in the signed contract was changed.
+
+## The consumer's review
+
+Held back from the author and run on the commit as pushed, 2026-11-23. Its figures, as it
+reported them:
+
+- 16,321 checks against exact rational arithmetic, none failed, and no compiler warning.
+- Plane cubics at the scale of its own use; 80 random cases of degrees 1 to 5 and
+  dimensions 1 to 3, with control points from 2^-100 to 2^100 and far from the origin;
+  control points from 2^-1060 to 2^-1074, where products underflow; a batch against its
+  single calls bit for bit; control points scaled from 2^-1000 to 2^1000; every refusal.
+- Every coordinate held to the contract's bound, with the sums of the bound computed from
+  the basis contract's formulas, and the rows compared bit for bit with the basis module's
+  own output.
+- Its worst errors, as fractions of the bound: 0.94 for a point, 0.85, 0.70 and 0.16 for
+  the first three derivatives. **The bound is nearly tight for the point**, as a bound
+  taken term by term on a sum is, and this record's own 0.26 did not show that: the
+  consumer's control points far from the origin did.
+- Four plants of its own, all caught.
 
 ## The order of work
 

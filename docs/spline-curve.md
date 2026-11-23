@@ -1,9 +1,9 @@
 # A B-spline curve and its derivatives
 
 **State: built in batch 2, 2026-11-23**, to the contract the library's first consumer
-signed as written the same day. [The record](batch2.md) has what was measured. Building it
-changed no clause; three things the draft left unsaid are marked *as built* where they
-stand.
+signed as written the same day. [The record](batch2.md) has what was measured, and the
+consumer's own review of the code, which found no defect. Building it changed no clause;
+three things the draft left unsaid are marked *as built* where they stand.
 
 Package `coalton-geometry/spline/curve`. It stands on
 [the basis module](spline-basis.md), whose terms and refusals it keeps, and on
@@ -115,7 +115,9 @@ module does not look: it would be deciding from the control points' values, whic
 Derived before the code, checked by the consumer, and then confirmed against the exact
 reference: every one of 58,182 numbers from 53 knot vectors is within it, the worst at
 0.26 of the bound, and 1,601 more from control points so small that the underflow terms
-are what admits them. [The record](batch2.md) has the measurement.
+are what admits them. The consumer's review reached 0.94 of the bound for a point, with
+control points far from the origin: the bound is nearly tight and holds.
+[The record](batch2.md) has both measurements.
 
 A basis entry carries at most `5p` rounding factors. Its product with a coordinate adds
 one, and summing `p + 1` terms adds at most `p`. So for each coordinate of the point,

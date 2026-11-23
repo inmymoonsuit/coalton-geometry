@@ -5,8 +5,8 @@
 **Two modules are built**: [B-spline basis functions](docs/spline-basis.md) in batch 1 and
 [B-spline curves](docs/spline-curve.md) in batch 2, with their derivatives. The records of
 [batch 1](docs/batch1.md) and [batch 2](docs/batch2.md) have what was measured. The
-library's first consumer has reviewed batch 1's code with tests of its own and found no
-defect; batch 2's is with it. [The batch plan](docs/plan.md)
+library's first consumer has reviewed the code of both with tests of its own and found no
+defect in either. [The batch plan](docs/plan.md)
 has the order of what follows; the next, [the nearest parameter to a point](docs/spline-nearest.md),
 is a draft contract with that consumer, and no code is written before it signs.
 
