@@ -20,15 +20,23 @@ flatter the tests; that is why INVALID is its own verdict. EXPECTED, by default 
 there so that a roster can hold the runner's own controls. The run fails unless every plant
 has its expected verdict and the restored sources pass.
 
+A CAUGHT line names the pass marks that went missing, which is which checks noticed.
+
 One process at a time. Sources are restored whatever happens. Logs go under build/plants/.
+
+On a machine shared with other work, set COALTON_GEOMETRY_PLANTS_WAIT to a command that exits
+0 when the machine is free. It is asked before every run, every five seconds for up to half an
+hour, and the run starts when it says yes.
 """
 
 from __future__ import annotations
 
+import os
 import pathlib
 import runpy
 import subprocess
 import sys
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LOGS = ROOT / "build" / "plants"
@@ -38,8 +46,21 @@ NOT_COMPILED = ("COMPILE-FILE-ERROR", "The compiler warned while building", "Inv
                 "READ error", "end of file on")
 
 
+def wait_until_free() -> None:
+    """Ask the caller's own command, if there is one, until it says the machine is free."""
+    command = os.environ.get("COALTON_GEOMETRY_PLANTS_WAIT")
+    if not command:
+        return
+    deadline = time.monotonic() + 1800
+    while subprocess.run(command, shell=True, capture_output=True, cwd=ROOT).returncode != 0:
+        if time.monotonic() > deadline:
+            raise SystemExit("The machine was not free within half an hour; nothing more was run.")
+        time.sleep(5)
+
+
 def run(log_name: str, pass_marks) -> tuple[list[str], bool]:
     """Run the checks. Returns the pass marks seen and whether the sources failed to compile."""
+    wait_until_free()
     done = subprocess.run(COMMAND, capture_output=True, text=True, cwd=ROOT)
     text = done.stdout + "\n" + done.stderr
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -84,7 +105,9 @@ def main() -> int:
             verdict = "INVALID" if not_compiled else ("CAUGHT" if len(seen) < len(pass_marks) else "MISSED")
             as_expected = as_expected and verdict == expected
             note = "" if verdict == expected else f"   <-- expected {expected}"
-            print(f"{index} {verdict}: {label}{note}", flush=True)
+            missing = [mark for mark in pass_marks if mark not in seen]
+            by = f"   [{', '.join(missing)}]" if verdict == "CAUGHT" else ""
+            print(f"{index} {verdict}: {label}{by}{note}", flush=True)
     finally:
         for name, original in originals.items():
             (ROOT / name).write_bytes(original.encode("utf-8"))

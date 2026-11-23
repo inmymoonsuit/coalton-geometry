@@ -1,6 +1,6 @@
 (asdf:defsystem "coalton-geometry"
-  :description "Geometry in Coalton. Reserved: no module is built yet; see ROADMAP.md."
-  :version "0.0.1"
+  :description "Geometry in Coalton for a numerical solver: B-spline basis functions and their derivatives. See ROADMAP.md for what follows."
+  :version "0.1.0"
   :license "MIT"
   :defsystem-depends-on ("coalton-asdf")
   :depends-on ("coalton")
@@ -10,12 +10,14 @@
     (let ((sb-ext:*derive-function-types* t)
           (sb-ext:*block-compile-default* :specified))
       (funcall compile)))
-  ;; No component is declared until a module has a contract and a consumer. A module is added
-  ;; here as a :ct-file under a "src" module, and the two rosters then read it from the sources.
-  :components ())
+  ;; A module is added here as a :ct-file once it has a contract and a consumer, and the two
+  ;; rosters then read it from the sources.
+  :components ((:module "src" :serial t
+                :components ((:module "spline" :serial t
+                              :components ((:ct-file "basis")))))))
 
 (asdf:defsystem "coalton-geometry/tests"
-  :description "The checks that hold before any module exists: the toolchain compiles Coalton, the rosters read the sources, and how a point can be stored is measured."
+  :description "Each module against its contract, the two rosters over every exported call, and how a point can be stored, measured."
   :depends-on ("coalton-geometry")
   :serial t
   :around-compile
@@ -27,6 +29,7 @@
                 :components ((:file "support")
                              (:ct-file "representation-subject") (:ct-file "representation-callers")
                              (:file "representation")
+                             (:ct-file "spline-basis-callers") (:file "spline-basis")
                              (:file "aliasing") (:file "scale-sweep")
                              (:file "suite"))))
   :perform (asdf:test-op (operation system)

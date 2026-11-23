@@ -140,9 +140,72 @@ it: the output and the number, or the refusal's own words."
 function of the exponent that returns the outputs. The run's source is kept, to check the calls against."
   `(list ,name ',covers ,tolerance ',declared ,run ',run))
 
+(defun sweep-basis-knots (k)
+  "A clamped cubic knot vector with two interior knots, none of them zero, so that every knot moves with the scale."
+  (sweep-array (doubles 1d0 1d0 1d0 1d0 2d0 4d0 5d0 5d0 5d0 5d0) k))
+
+(defun sweep-rows (blocks width row)
+  "Row ROW of each block of an output laid out as evaluate! lays one out, the blocks one after another."
+  (let* ((per (/ (length blocks) 4)) (found '()))
+    (dotimes (block 4)
+      (dotimes (r width)
+        (push (aref blocks (+ (* block per) (* row width) r)) found)))
+    (coerce (nreverse found) '(simple-array double-float (*)))))
+
 (defun sweep-roster ()
-  "The entries. No call of the library takes or returns a floating-point number yet, so there is none."
-  (list))
+  "The entries."
+  (list
+   (sweep-entry "a basis and what it reads back, the knots scaled"
+       (basis:make-basis basis:domain-start basis:domain-end basis:knots) 0d0
+       ((-1020 1020 :exact))
+     (lambda (k)
+       (let ((handle (basis:make-basis 3 (sweep-basis-knots k) 2)))
+         (list (sweep-out "domain-start" (basis:domain-start handle) 1)
+               (sweep-out "domain-end" (basis:domain-end handle) 1)
+               (sweep-out "knots" (basis:knots handle) 1)))))
+
+   ;; The values and the spans do not move with the scale, anywhere in the format.
+   (sweep-entry "values of a basis, the knots and the parameters scaled"
+       (basis:evaluate! basis:evaluate-batch!) 0d0
+       ((-1020 1020 :exact))
+     (lambda (k)
+       (let* ((handle (basis:make-basis 3 (sweep-basis-knots k) 2))
+              (parameters (sweep-array (doubles 1.5d0 2d0 3.75d0 5d0) k))
+              (single (make-array 4 :element-type 'double-float :initial-element 0d0))
+              (spans (make-array 4 :element-type '(unsigned-byte 62) :initial-element 0))
+              (batch (make-array 16 :element-type 'double-float :initial-element 0d0)))
+         (sweep-need (basis:evaluate! handle (aref parameters 2) 0 single) basis:BasisSuccess)
+         (sweep-need (basis:evaluate-batch! handle parameters 0 spans batch) basis:BasisSuccess)
+         (list (sweep-out "span" (basis:latest-span handle) 0)
+               (sweep-out "values" single 0)
+               (sweep-out "spans" spans 0)
+               (sweep-out "batch values" batch 0)))))
+
+   ;; A derivative of order m moves by the scale to the power -m. Where the knots are small the
+   ;; second one is too large to hold and the call says so; where they are large it is too small
+   ;; to be a normal number. The tolerance is for the edge of that: at 2^510 some second
+   ;; derivatives are still normal numbers while the quotients they are differences of are not,
+   ;; and those come back within a few last places and not exactly, as do the first derivatives
+   ;; at 2^1020. That is the underflow term of the contract's bound, seen. With no tolerance
+   ;; those two runs are :wrong.
+   (sweep-entry "derivatives of a basis, the knots and the parameters scaled"
+       (basis:evaluate! basis:evaluate-batch!) 1d-15
+       ((-1020 -512 :refused) (-510 400 :exact) (510 1020 :lost))
+     (lambda (k)
+       (let* ((handle (basis:make-basis 3 (sweep-basis-knots k) 2))
+              (parameters (sweep-array (doubles 1.5d0 2d0 3.75d0 5d0) k))
+              (single (make-array 12 :element-type 'double-float :initial-element 0d0))
+              (spans (make-array 4 :element-type '(unsigned-byte 62) :initial-element 0))
+              (batch (make-array 48 :element-type 'double-float :initial-element 0d0)))
+         (sweep-need (basis:evaluate! handle (aref parameters 2) 2 single) basis:BasisSuccess)
+         (sweep-need (basis:evaluate-batch! handle parameters 2 spans batch) basis:BasisSuccess)
+         (list (sweep-out "values" (subseq single 0 4) 0)
+               (sweep-out "first derivatives" (subseq single 4 8) -1)
+               (sweep-out "second derivatives" (subseq single 8 12) -2)
+               (sweep-out "spans" spans 0)
+               (sweep-out "batch values" (sweep-rows batch 4 0) 0)
+               (sweep-out "batch first derivatives" (sweep-rows batch 4 1) -1)
+               (sweep-out "batch second derivatives" (sweep-rows batch 4 2) -2)))))))
 
 ;;; ---- The roster against the sources, and its run -------------------------------------------
 

@@ -7,7 +7,9 @@ are in place here before the first call so that no call is ever outside them.
 the questions; [the sister library's page](https://github.com/inmymoonsuit/coalton-linalg/blob/main/docs/rosters.md)
 has the same machinery with its members and what it found.
 
-**Both rosters have no member yet.** What runs today is their machinery and its controls.
+**The first module's calls are the members today**: one call takes more than one array,
+and six take or return floating-point numbers or return a status. Beside them run the
+machinery's own controls.
 
 ## Membership is read from the sources
 
@@ -32,6 +34,10 @@ asks, an output that is also an input, would have to be asked of whatever can be
 positions either does exactly what it does with two arrays of equal contents, or refuses
 before it writes anything. Each entry declares which, for each pair that could be one
 array, and the roster fails when a pair does the other.
+
+The roster asks only of arrays passed as arguments. An array a caller holds by another
+route is outside it: the basis module's borrowed view of its knots, passed back as an
+output, is such a case, refused by the module and tested by the module's own tests.
 
 ## The scale-sweep roster
 

@@ -1,0 +1,377 @@
+(cl:defpackage #:coalton-geometry/spline/basis
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:math #:coalton/math))
+  (:export #:Basis #:make-basis
+           #:BasisError #:DegreeBelowOne #:TooFewKnots #:KnotNotFinite #:KnotsDecrease
+           #:KnotRepeatedTooOften #:EmptyDomain #:KnotSpanTooLarge #:OutputAliased
+           #:degree #:knot-count #:control-count #:highest-order #:domain-start #:domain-end #:knots
+           #:BasisStatus #:BasisSuccess #:BasisOutsideDomain #:BasisNonFinite
+           #:BasisDerivativeUndefined #:BasisBadOrder #:BasisBadSize
+           #:evaluate! #:latest-span #:evaluate-batch! #:refused-index))
+(cl:in-package #:coalton-geometry/spline/basis)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; B-spline basis functions and their derivatives at a parameter. docs/spline-basis.md is the
+;;; contract and derives the error bound this file is written to meet; docs/provenance.md says
+;;; where the method was read.
+
+(coalton-toplevel
+  (define-exception BasisError
+    "Why a basis could not be made, or why a call was refused as it was written. Raised before anything is allocated or written."
+    (DegreeBelowOne UFix)
+    "The degree given, which is zero."
+    (TooFewKnots UFix UFix)
+    "The number of knots given, then the degree: twice the degree and two more are needed."
+    (KnotNotFinite UFix)
+    "The index of a knot that is an infinity or not a number."
+    (KnotsDecrease UFix)
+    "The index of a knot that is below the one before it."
+    (KnotRepeatedTooOften UFix)
+    "The index of the first of a run of equal knots longer than the degree and one."
+    (EmptyDomain UFix UFix)
+    "The indices of the two knots that bound the domain, which are equal."
+    (KnotSpanTooLarge UFix)
+    "The index of the last knot: its difference from the first is not a finite number."
+    (OutputAliased String)
+    "An output that is the same array as something the call reads.")
+
+  (derive Eq)
+  (repr :enum)
+  (define-type BasisStatus
+    "Outcome of evaluate! and evaluate-batch!."
+    BasisSuccess
+    "Every value asked for is written."
+    BasisOutsideDomain
+    "A parameter is below the start of the domain or above its end. Nothing is written."
+    BasisNonFinite
+    "A parameter is not finite, and nothing is written; or a derivative is too large to hold, and the output is unspecified."
+    BasisDerivativeUndefined
+    "The order asked for does not exist at an interior knot that a parameter equals. Nothing is written."
+    BasisBadOrder
+    "The order is above the one the basis was made for. Nothing is written."
+    BasisBadSize
+    "An array's length is not what the call needs. Nothing is written.")
+
+  (define-struct BasisStorage
+    "The knots, copied, and every workspace a call uses."
+    (p UFix)
+    (limit UFix)
+    (final UFix)
+    (crowd UFix)
+    (knot (arr:LispArray F64))
+    (table (arr:LispArray F64))
+    (stage (arr:LispArray F64))
+    (ratio (arr:LispArray F64))
+    (held (arr:LispArray F64))
+    (state (arr:LispArray UFix)))
+
+  (repr :transparent)
+  (define-type Basis
+    "Private handle for one knot vector; make one with make-basis. Calls sharing a handle are not reentrant."
+    (MkBasis BasisStorage))
+
+  (inline)
+  (declare storage (Basis -> BasisStorage))
+  (define (storage basis) (match basis ((MkBasis kept) kept)))
+
+  (inline)
+  (declare count->float (UFix -> F64))
+  (define (count->float count)
+    "A count as a floating-point number; exact below 2^53."
+    (lisp (-> F64) (count) (cl:coerce count 'cl:double-float)))
+
+  (inline)
+  (declare halfway (UFix * UFix -> UFix))
+  (define (halfway low high)
+    "The index midway between two, rounded down."
+    (lisp (-> UFix) (low high) (cl:ash (cl:+ low high) -1)))
+
+  (inline)
+  (declare holds-exactly? (UFix * UFix * UFix * UFix -> Boolean))
+  (define (holds-exactly? entries blocks order width)
+    "Whether an array of this many entries is this many blocks of order + 1 rows of this width. The product is formed in integers of any size, so nothing wraps."
+    (lisp (-> Boolean) (entries blocks order width) (cl:= entries (cl:* blocks (cl:+ order 1) width))))
+
+  (declare make-basis (UFix * arr:LispArray F64 * UFix -> Basis))
+  (define (make-basis degree knots order)
+    "A basis of this degree on these knots, for derivatives up to this order. The knots are checked and copied, and every workspace is allocated here: no later call allocates. A knot vector that is not one is a BasisError."
+    (let count = (arr:length knots))
+    (when (< degree 1)
+      (throw (DegreeBelowOne degree)))
+    (when (or (> degree count) (< (- count degree) (+ degree 2)))
+      (throw (TooFewKnots count degree)))
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (unless (inline (math:finite? (arr:aref knots i)))
+        (throw (KnotNotFinite i))))
+    (for ((i 1 (+ i 1))) :while (< i count)
+      (when (< (arr:aref knots i) (arr:aref knots (- i 1)))
+        (throw (KnotsDecrease i))))
+    (let width = (+ degree 1))
+    (for ((i 0 (+ i 1))) :while (< (+ i width) count)
+      (when (== (arr:aref knots i) (arr:aref knots (+ i width)))
+        (throw (KnotRepeatedTooOften i))))
+    (let controls = (- count width))
+    (when (== (arr:aref knots degree) (arr:aref knots controls))
+      (throw (EmptyDomain degree controls)))
+    (unless (inline (math:finite? (- (arr:aref knots (- count 1)) (arr:aref knots 0))))
+      (throw (KnotSpanTooLarge (- count 1))))
+    (let copy = (arr:make count 0.0d0))
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (arr:set! copy i (arr:aref knots i)))
+    (let state = (arr:make 4 (the UFix 0)))
+    ;; The last span: the highest knot of the domain that is below its end.
+    (for ((i degree (+ i 1))) :while (< i controls)
+      (when (< (arr:aref copy i) (arr:aref copy controls))
+        (arr:set! state 0 i)))
+    ;; The longest run of equal knots strictly inside the domain: slot 3 counts the run that
+    ;; ends at i, and slot 1 keeps the longest.
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (cond
+        ((and (> i 0) (== (arr:aref copy i) (arr:aref copy (- i 1))))
+         (arr:set! state 3 (+ (arr:aref state 3) 1)))
+        (True (arr:set! state 3 1)))
+      (when (and (> (arr:aref copy i) (arr:aref copy degree))
+                 (and (< (arr:aref copy i) (arr:aref copy controls))
+                      (> (arr:aref state 3) (arr:aref state 1))))
+        (arr:set! state 1 (arr:aref state 3))))
+    (let final = (arr:aref state 0))
+    (let crowd = (arr:aref state 1))
+    (for ((i 0 (+ i 1))) :while (< i 4)
+      (arr:set! state i 0))
+    (MkBasis (BasisStorage degree order final crowd copy
+                           (arr:make (* width width) 0.0d0)
+                           (arr:make (* (+ (min order degree) 1) width) 0.0d0)
+                           (arr:make width 0.0d0)
+                           (arr:make 1 0.0d0)
+                           state)))
+
+  (declare degree (Basis -> UFix))
+  (define (degree basis)
+    "The degree of the basis functions."
+    (.p (storage basis)))
+
+  (declare knot-count (Basis -> UFix))
+  (define (knot-count basis)
+    "The number of knots."
+    (arr:length (.knot (storage basis))))
+
+  (declare control-count (Basis -> UFix))
+  (define (control-count basis)
+    "The number of basis functions, which is the number of control points a curve on these knots has: the knots less the degree and one."
+    (- (arr:length (.knot (storage basis))) (+ (.p (storage basis)) 1)))
+
+  (declare highest-order (Basis -> UFix))
+  (define (highest-order basis)
+    "The highest derivative a call on this basis may ask for."
+    (.limit (storage basis)))
+
+  (declare domain-start (Basis -> F64))
+  (define (domain-start basis)
+    "The least parameter: the knot whose index is the degree."
+    (arr:aref (.knot (storage basis)) (.p (storage basis))))
+
+  (declare domain-end (Basis -> F64))
+  (define (domain-end basis)
+    "The greatest parameter: the knot whose index is the number of basis functions."
+    (arr:aref (.knot (storage basis)) (control-count basis)))
+
+  (declare knots (Basis -> arr:LispArray F64))
+  (define (knots basis)
+    "Borrowed view of the basis's own copy of the knots. Read it; a call given it as an output refuses."
+    (.knot (storage basis)))
+
+  (declare latest-span (Basis -> UFix))
+  (define (latest-span basis)
+    "The span of the latest evaluate! that returned BasisSuccess: the functions it wrote are those numbered from the span less the degree to the span. 0 before any."
+    (arr:aref (.state (storage basis)) 0))
+
+  (declare refused-index (Basis -> UFix))
+  (define (refused-index basis)
+    "After an evaluate-batch! that a parameter caused to refuse, the position of the first such parameter. After any other evaluate-batch!, the number of parameters it was given."
+    (arr:aref (.state (storage basis)) 1))
+
+  (declare locate! (BasisStorage -> UFix))
+  (define (locate! store)
+    "The span of the held parameter, which is finite and in the domain: the knot interval, closed on the left, that holds it, and the last one for the end of the domain."
+    (let knot = (.knot store))
+    (let state = (.state store))
+    (let u = (arr:aref (.held store) 0))
+    (let controls = (- (arr:length knot) (+ (.p store) 1)))
+    (when (>= u (arr:aref knot controls))
+      (return (.final store)))
+    ;; Between slots 2 and 3 there is always a knot at or below the parameter and one above it.
+    (arr:set! state 2 (.p store))
+    (arr:set! state 3 controls)
+    (for () :while (> (- (arr:aref state 3) (arr:aref state 2)) 1)
+      (let middle = (halfway (arr:aref state 2) (arr:aref state 3)))
+      (cond
+        ((<= (arr:aref knot middle) u) (arr:set! state 2 middle))
+        (True (arr:set! state 3 middle))))
+    (arr:aref state 2))
+
+  (declare multiplicity (BasisStorage * UFix -> UFix))
+  (define (multiplicity store span)
+    "How many knots equal the one that opens this span."
+    (let knot = (.knot store))
+    (let state = (.state store))
+    (arr:set! state 2 1)
+    (for ((i span (- i 1))) :while (and (> i 0) (== (arr:aref knot (- i 1)) (arr:aref knot span)))
+      (arr:set! state 2 (+ (arr:aref state 2) 1)))
+    (arr:aref state 2))
+
+  (declare admit (BasisStorage * UFix -> BasisStatus))
+  (define (admit store order)
+    "Whether the held parameter can be evaluated to this order: BasisSuccess, or the refusal it gets. Writes nothing a caller can read."
+    (let knot = (.knot store))
+    (let u = (arr:aref (.held store) 0))
+    (let p = (.p store))
+    (let controls = (- (arr:length knot) (+ p 1)))
+    (unless (inline (math:finite? u))
+      (return BasisNonFinite))
+    (when (or (< u (arr:aref knot p)) (> u (arr:aref knot controls)))
+      (return BasisOutsideDomain))
+    ;; No interior knot is repeated often enough to lose a derivative of this order, so where
+    ;; the parameter lies does not matter.
+    (when (and (<= order p) (<= (.crowd store) (- p order)))
+      (return BasisSuccess))
+    ;; At either end of the domain the derivative is the one from inside it.
+    (when (or (== u (arr:aref knot p)) (== u (arr:aref knot controls)))
+      (return BasisSuccess))
+    (let span = (locate! store))
+    (unless (== u (arr:aref knot span))
+      (return BasisSuccess))
+    (cond
+      ((and (<= order p) (<= (multiplicity store span) (- p order))) BasisSuccess)
+      (True BasisDerivativeUndefined)))
+
+  (declare fill! (BasisStorage * UFix * UFix -> Boolean))
+  (define (fill! store span rows)
+    "Compute into the stage, for the held parameter on this span, the values and then each derivative up to rows - 1, rows being at most the degree and one. False when a derivative is not a finite number."
+    (let knot = (.knot store))
+    (let table = (.table store))
+    (let stage = (.stage store))
+    (let ratio = (.ratio store))
+    (let u = (arr:aref (.held store) 0))
+    (let p = (.p store))
+    (let width = (+ p 1))
+    (let above = (+ span 1))
+    ;; Row k of the table holds the functions of degree k that are not zero on the span, the
+    ;; lowest-numbered first. Each function of the degree below is split between the two of
+    ;; this degree that it feeds, by two weights that are each a quotient of knot differences.
+    ;; Every interval divided by holds the span, so none is empty.
+    (arr:set! table 0 1.0d0)
+    (for ((k 1 (+ k 1))) :while (<= k p)
+      (let below = (* (- k 1) width))
+      (let here = (* k width))
+      (let first = (- above k))
+      (arr:set! table here 0.0d0)
+      (for ((q 0 (+ q 1))) :while (< q k)
+        (let lower = (arr:aref knot (+ first q)))
+        (let upper = (arr:aref knot (+ above q)))
+        (let spread = (- upper lower))
+        (let rising = (/ (- u lower) spread))
+        (let falling = (/ (- upper u) spread))
+        (let fed = (arr:aref table (+ below q)))
+        (arr:set! table (+ here q) (+ (arr:aref table (+ here q)) (* falling fed)))
+        (arr:set! table (+ (+ here q) 1) (* rising fed))))
+    (for ((r 0 (+ r 1))) :while (< r width)
+      (arr:set! stage r (arr:aref table (+ (* p width) r))))
+    ;; The derivative of order m starts from the values of degree p - m and is raised one
+    ;; degree at a time: each entry divided by the knot interval of its function, then the
+    ;; difference of neighbours times the degree reached.
+    (for ((m 1 (+ m 1))) :while (< m rows)
+      (let base = (* m width))
+      (let start = (- p m))
+      (for ((r 0 (+ r 1))) :while (<= r start)
+        (arr:set! stage (+ base r) (arr:aref table (+ (* start width) r))))
+      (for ((d (+ start 1) (+ d 1))) :while (<= d p)
+        (let first = (- above d))
+        (let scale = (count->float d))
+        (for ((i 0 (+ i 1))) :while (< i d)
+          (arr:set! ratio i (/ (arr:aref stage (+ base i))
+                               (- (arr:aref knot (+ above i)) (arr:aref knot (+ first i))))))
+        (arr:set! stage (+ base d) (* scale (arr:aref ratio (- d 1))))
+        (for ((r (- d 1) (- r 1))) :while (> r 0)
+          (arr:set! stage (+ base r) (* scale (- (arr:aref ratio (- r 1)) (arr:aref ratio r)))))
+        (arr:set! stage base (* scale (- 0.0d0 (arr:aref ratio 0))))))
+    (for ((i width (+ i 1))) :while (< i (* rows width))
+      (unless (inline (math:finite? (arr:aref stage i)))
+        (return False)))
+    True)
+
+  (declare deliver! (BasisStorage * UFix * UFix * arr:LispArray F64 * UFix -> Void))
+  (define (deliver! store rows order out offset)
+    "Copy the stage's rows into out from this offset, and write zero for every order above the degree."
+    (let stage = (.stage store))
+    (let width = (+ (.p store) 1))
+    (let computed = (* rows width))
+    (let all = (* (+ order 1) width))
+    (for ((i 0 (+ i 1))) :while (< i computed)
+      (arr:set! out (+ offset i) (arr:aref stage i)))
+    (for ((i computed (+ i 1))) :while (< i all)
+      (arr:set! out (+ offset i) 0.0d0)))
+
+  (declare evaluate-held! (Basis * UFix * arr:LispArray F64 -> BasisStatus))
+  (define (evaluate-held! basis order out)
+    "evaluate! for the parameter already held in the basis."
+    (let store = (storage basis))
+    (when (unsafe-pointer-eq? out (.knot store))
+      (throw (OutputAliased "The output is the basis's own knots.")))
+    (when (> order (.limit store))
+      (return BasisBadOrder))
+    (unless (holds-exactly? (arr:length out) 1 order (+ (.p store) 1))
+      (return BasisBadSize))
+    (let status = (admit store order))
+    (unless (== status BasisSuccess)
+      (return status))
+    (let span = (locate! store))
+    (let rows = (+ (min order (.p store)) 1))
+    (unless (fill! store span rows)
+      (return BasisNonFinite))
+    (deliver! store rows order out 0)
+    (arr:set! (.state store) 0 span)
+    BasisSuccess)
+
+  (declare evaluate! (Basis * F64 * UFix * arr:LispArray F64 -> BasisStatus))
+  (define (evaluate! basis parameter order out)
+    "Write into out the values at the parameter of the degree + 1 basis functions that are not zero on its span, then their first derivatives, and so on to the order: (order + 1)(degree + 1) numbers, each row in increasing number of basis function. Read the span with latest-span. On any status but BasisSuccess nothing is written. See docs/spline-basis.md."
+    ;; The parameter is put where the workers read it, as a batch puts each of its own.
+    (arr:set! (.held (storage basis)) 0 parameter)
+    (evaluate-held! basis order out))
+
+  (declare evaluate-batch! (Basis * arr:LispArray F64 * UFix * arr:LispArray UFix * arr:LispArray F64 -> BasisStatus))
+  (define (evaluate-batch! basis parameters order spans out)
+    "For each parameter in turn, write its span into spans and its block of (order + 1)(degree + 1) numbers into out, as evaluate! lays one out. Every parameter is checked before anything is written; a refusal a parameter causes leaves its position in refused-index. Only BasisNonFinite for a derivative too large to hold can come after a write. See docs/spline-basis.md."
+    (let store = (storage basis))
+    (let state = (.state store))
+    (let held = (.held store))
+    (let count = (arr:length parameters))
+    (when (unsafe-pointer-eq? out (.knot store))
+      (throw (OutputAliased "The output is the basis's own knots.")))
+    (when (unsafe-pointer-eq? out parameters)
+      (throw (OutputAliased "The output is the array of parameters.")))
+    (arr:set! state 1 count)
+    (when (> order (.limit store))
+      (return BasisBadOrder))
+    (let width = (+ (.p store) 1))
+    (unless (and (== (arr:length spans) count) (holds-exactly? (arr:length out) count order width))
+      (return BasisBadSize))
+    (when (== count 0)
+      (return BasisSuccess))
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (arr:set! held 0 (arr:aref parameters i))
+      (let status = (admit store order))
+      (unless (== status BasisSuccess)
+        (arr:set! state 1 i)
+        (return status)))
+    (let rows = (+ (min order (.p store)) 1))
+    (let block = (* (+ order 1) width))
+    (for ((i 0 (+ i 1))) :while (< i count)
+      (arr:set! held 0 (arr:aref parameters i))
+      (let span = (locate! store))
+      (unless (fill! store span rows)
+        (arr:set! state 1 i)
+        (return BasisNonFinite))
+      (arr:set! spans i span)
+      (deliver! store rows order out (* i block)))
+    BasisSuccess))

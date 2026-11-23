@@ -148,9 +148,16 @@ Anything else is an error."
 
 (defun alias-roster ()
   "One entry for each member: its key, how to make its arrays afresh, how to call it on them, and the outcome
-expected of each pair that can be one array. An entry of (key :exempt reason) has no test. No call of the library
-takes two arrays yet, so there is none."
-  (list))
+expected of each pair that can be one array. An entry of (key :exempt reason) has no test."
+  (list
+   ;; The parameters and the output are both arrays of doubles. The output is a whole block for
+   ;; each parameter, so the two have one length only when there is no parameter at all; that is
+   ;; the one case in which they can be one array, and the call refuses it.
+   (list "coalton-geometry/spline/basis:evaluate-batch!"
+         (lambda () (list (doubles) (indices) (doubles)))
+         (let ((handle (basis:make-basis 2 (doubles 0d0 0d0 0d0 1d0 1d0 1d0) 1)))
+           (lambda (a) (bc:batch-code handle (first a) 1 (second a) (third a))))
+         '(((0 2) :refused)))))
 
 (defun alias-missing (inventory keys)
   "Members of the inventory the roster does not name, and names in the roster that are not members."

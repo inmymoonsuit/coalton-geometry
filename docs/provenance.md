@@ -60,7 +60,20 @@ each planned batch expects to read; an entry here is the record that it did.
 
 | Method | Read in: work, edition, section, page, equation or algorithm | Form read | Status of that source | Used by |
 | --- | --- | --- | --- | --- |
-| *none yet* | | | | |
+| B-spline basis functions by the recurrence that defines each degree from the one below, with the convention that a term whose knots coincide is zero | Prautzsch, Boehm and Paluszny, *Bézier and B-Spline Techniques*, Springer 2002 (softcover reprint of the first edition): section 5.3, pp. 61 to 62, the recursion formula and the convention that follows it | Mathematics and prose; the text has no listing | In copyright; the method is taken and none of the text | `src/spline/basis.ct` |
+| The derivative of a basis function as a difference of two of the degree below, each divided by a knot difference | The same: section 5.6, p. 67, equation (1); section 5.7, p. 68, the last property listed | Mathematics | As above | `src/spline/basis.ct` |
+| Marsden's identity, from which the tests' exact reference is solved as a linear system | The same: section 5.12, p. 75, Problem 4; and section 5.8, p. 69, which generalises it | Mathematics | As above | `tests/spline-basis.lisp` |
+| The model of rounding, with and without underflow, and the accumulation of rounding factors that the error bound is stated in | Higham, *Accuracy and Stability of Numerical Algorithms*, second edition, SIAM 2002: section 2.2, p. 40, equation (2.4); section 3.1, p. 63, Lemma 3.1; and the notes to chapter 2, p. 56, equation (2.8) | Mathematics | As above | `docs/spline-basis.md`, `tests/spline-basis.lisp` |
+
+**What the first two entries do not cover, because no text was read for it.** The text
+gives the recurrence as a definition, not as a procedure. How the computation is arranged
+is this library's, worked out from that definition and from what the contract's error
+bound requires: the functions that are not zero on one span, taken degree by degree; each
+function of a degree divided between the two of the next that it feeds, by two weights
+that are each formed as a quotient; every degree kept, so that a derivative of order `m`
+can start from the values of degree `p - m` and be raised one degree at a time. The error
+bound and its two underflow terms are derived in [the contract](spline-basis.md#the-error-bound)
+from Higham's model and are not taken from a text.
 
 ## What was carried over
 

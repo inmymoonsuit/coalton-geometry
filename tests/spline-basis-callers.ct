@@ -1,0 +1,89 @@
+(cl:defpackage #:coalton-geometry/tests/spline-basis-callers
+  (:use #:coalton #:coalton-prelude)
+  (:local-nicknames (#:arr #:coalton/lisparray) (#:basis #:coalton-geometry/spline/basis))
+  (:export #:make-code #:make-detail #:evaluate-code #:batch-code #:evaluate-loop #:batch-loop))
+(cl:in-package #:coalton-geometry/tests/spline-basis-callers)
+(cl:declaim (cl:optimize (cl:speed 3) (cl:safety #.(cl:if (cl:member :coalton-geometry-safety-zero cl:*features*) 0 1))))
+
+;;; A caller's side of the basis module, compiled in a file and a package of its own: outcomes
+;;; as numbers a Lisp test can compare, typed errors caught as their type, and the loops the
+;;; allocation measurement counts.
+
+(coalton-toplevel
+  (declare status-code (basis:BasisStatus -> UFix))
+  (define (status-code status)
+    (match status
+      ((basis:BasisSuccess) 0)
+      ((basis:BasisOutsideDomain) 1)
+      ((basis:BasisNonFinite) 2)
+      ((basis:BasisDerivativeUndefined) 3)
+      ((basis:BasisBadOrder) 4)
+      ((basis:BasisBadSize) 5)))
+
+  (declare error-code (basis:BasisError -> UFix))
+  (define (error-code problem)
+    (match problem
+      ((basis:DegreeBelowOne _) 1)
+      ((basis:TooFewKnots _ _) 2)
+      ((basis:KnotNotFinite _) 3)
+      ((basis:KnotsDecrease _) 4)
+      ((basis:KnotRepeatedTooOften _) 5)
+      ((basis:EmptyDomain _ _) 6)
+      ((basis:KnotSpanTooLarge _) 7)
+      ((basis:OutputAliased _) 8)))
+
+  (declare error-detail (basis:BasisError -> UFix))
+  (define (error-detail problem)
+    (match problem
+      ((basis:DegreeBelowOne given) given)
+      ((basis:TooFewKnots given _) given)
+      ((basis:KnotNotFinite index) index)
+      ((basis:KnotsDecrease index) index)
+      ((basis:KnotRepeatedTooOften index) index)
+      ((basis:EmptyDomain start _) start)
+      ((basis:KnotSpanTooLarge index) index)
+      ((basis:OutputAliased _) 0)))
+
+  (declare make-code (UFix * arr:LispArray F64 * UFix -> UFix))
+  (define (make-code degree knots order)
+    "0 when a basis is made; otherwise the number of the rule that refused the knots, and 99 for an error that is not the library's own."
+    (catch (progn (basis:make-basis degree knots order) 0)
+      ((the basis:BasisError problem) (error-code problem))
+      (_ 99)))
+
+  (declare make-detail (UFix * arr:LispArray F64 * UFix -> UFix))
+  (define (make-detail degree knots order)
+    "The first number a refusal of the knots carries; 999 when a basis is made."
+    (catch (progn (basis:make-basis degree knots order) 999)
+      ((the basis:BasisError problem) (error-detail problem))
+      (_ 998)))
+
+  (declare evaluate-code (basis:Basis * F64 * UFix * arr:LispArray F64 -> UFix))
+  (define (evaluate-code handle parameter order out)
+    "The status of evaluate! as a number, or 100 and the number of a typed error."
+    (catch (status-code (basis:evaluate! handle parameter order out))
+      ((the basis:BasisError problem) (+ 100 (error-code problem)))
+      (_ 199)))
+
+  (declare batch-code (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray UFix * arr:LispArray F64 -> UFix))
+  (define (batch-code handle parameters order spans out)
+    "The status of evaluate-batch! as a number, or 100 and the number of a typed error."
+    (catch (status-code (basis:evaluate-batch! handle parameters order spans out))
+      ((the basis:BasisError problem) (+ 100 (error-code problem)))
+      (_ 199)))
+
+  (declare evaluate-loop (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray F64 * arr:LispArray UFix * UFix -> Void))
+  (define (evaluate-loop handle parameters order out tally count)
+    "count rounds of evaluate! at each parameter in turn. The calls that do not succeed are counted into tally[0]."
+    (for ((round 0 (+ round 1))) :while (< round count)
+      (for ((i 0 (+ i 1))) :while (< i (arr:length parameters))
+        (unless (== (basis:evaluate! handle (arr:aref parameters i) order out) basis:BasisSuccess)
+          (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))
+
+  (declare batch-loop (basis:Basis * arr:LispArray F64 * UFix * arr:LispArray UFix * arr:LispArray F64
+                       * arr:LispArray UFix * UFix -> Void))
+  (define (batch-loop handle parameters order spans out tally count)
+    "count calls of evaluate-batch! on the parameters. The calls that do not succeed are counted into tally[0]."
+    (for ((round 0 (+ round 1))) :while (< round count)
+      (unless (== (basis:evaluate-batch! handle parameters order spans out) basis:BasisSuccess)
+        (arr:set! tally 0 (+ (arr:aref tally 0) 1))))))

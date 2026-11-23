@@ -2,12 +2,14 @@
 
 Geometry in [Coalton](https://github.com/coalton-lang/coalton), as a library of its own.
 
-**Status: ready to start, with no geometry built yet.** This repository holds what a first
-module stands on: a pinned toolchain that compiles and checks, the two rosters that every
-exported call will have to answer, a measurement that decided how a point is stored, the
-design decisions, a [batch plan](docs/plan.md) and a
-[draft contract for the first module](docs/spline-basis.md). [The roadmap](ROADMAP.md)
-says what is waited for before that module is written.
+**Status: one module built.** [B-spline basis functions](docs/spline-basis.md) and their
+derivatives at a parameter, or at a batch of parameters, with an error bound that every
+number is tested against in exact arithmetic. [The batch plan](docs/plan.md) has what
+follows and [the roadmap](ROADMAP.md) what each waits for.
+
+| Package | What it gives | Contract |
+| --- | --- | --- |
+| `coalton-geometry/spline/basis` | The basis functions of a knot vector that are not zero at a parameter, and their derivatives to any order, into caller-owned arrays | [docs/spline-basis.md](docs/spline-basis.md) |
 
 It is the sister of [coalton-linalg](https://github.com/inmymoonsuit/coalton-linalg),
 numerical linear algebra in Coalton, and is built to the same rules: contracts written
@@ -30,13 +32,15 @@ reference.
 
 | Path | Purpose |
 | --- | --- |
-| `coalton-geometry.asd` | The library system, with no component yet, and its test system |
+| `coalton-geometry.asd` | The library system and its test system |
+| `src/` | The modules, one package a file |
+| `tests/spline-basis.lisp`, `tests/spline-basis-callers.ct` | The basis module against its contract: an exact reference, every refusal, batches, allocation |
 | `tests/representation-subject.ct`, `tests/representation-callers.ct`, `tests/representation.lisp` | How a point can be stored, measured on the pinned compiler; [the design notes](docs/design.md) rest on it |
-| `tests/aliasing.lisp`, `tests/scale-sweep.lisp` | The two [rosters](docs/rosters.md), with no member yet |
+| `tests/aliasing.lisp`, `tests/scale-sweep.lisp` | The two [rosters](docs/rosters.md), which every exported call answers |
 | `scripts/`, `tools/`, `toolchain.lock.json` | The check runner, the pinned toolchain it verifies, and the runner for planted defects |
 | `tests/plants/` | Rosters of planted defects, one for each batch |
 | `CONTEXT.md` | [The library's mathematical conventions and terms](CONTEXT.md) |
-| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [reference texts](docs/references.md), [rosters](docs/rosters.md), [the groundwork's record](docs/batch0.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
+| `docs/` | [Design decisions](docs/design.md), [batch plan](docs/plan.md), [developing a module](docs/development.md), [provenance](docs/provenance.md), [reference texts](docs/references.md), [rosters](docs/rosters.md), the records of [the groundwork](docs/batch0.md) and of [batch 1](docs/batch1.md), [toolchain](docs/toolchain.md), [setup](docs/setup.md) |
 
 ## Checking it
 

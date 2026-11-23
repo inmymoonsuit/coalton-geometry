@@ -55,7 +55,14 @@ python tools\plants.py tests\plants\groundwork.py
 The first verifies that every plant's site occurs exactly once, without running anything.
 The second applies each plant alone, runs the complete check, restores the source, and
 prints a verdict for each: `CAUGHT`, `MISSED`, or `INVALID` for a plant that did not
-compile and so tested nothing. Logs go under `build/plants/`.
+compile and so tested nothing. A `CAUGHT` line names the checks that noticed. Logs go
+under `build/plants/`. Each batch has its roster: `tests/plants/batch1.py` is the first
+module's.
+
+On a machine shared with other work, the runner can be told to wait: set
+`COALTON_GEOMETRY_PLANTS_WAIT` to a command that exits 0 when the machine is free, and it
+is asked before every run. A command that only looks for another process is not a lock;
+two waiters that both look and then start will overlap.
 
 ## Rules that were paid for
 
@@ -69,6 +76,11 @@ written down.
   moved to another file. Plant a defect and see it noticed.
 - **A plant that does not compile is not a catch.** An edit that leaves a variable unused
   is refused by the compiler; keep the use.
+- **A plant that is missed may be saying the code is not needed.** A mark put on a call to
+  keep a number from being boxed was planted away and nothing allocated. The mark went,
+  not the test.
+- **A fixture worked out by hand is checked like anything else.** Four of the first
+  module's were wrong and the module was right; each failed on the premise it asserted.
 - **Scaling by a power of two changes nothing**, so a plant that only does that is the
   original program.
 - **The compiler's warnings fail the build here.** It once went on after one and returned

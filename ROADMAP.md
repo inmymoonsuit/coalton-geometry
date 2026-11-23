@@ -2,21 +2,22 @@
 
 ## Where it stands
 
-**Ready to start, with nothing built.** The toolchain is pinned and checked, the two
-rosters exist with no member, how a point is stored is measured and decided, the scope and
-design are agreed, and [a batch plan](docs/plan.md) follows a first consumer's ranking.
-[The groundwork's record](docs/batch0.md) has the evidence. No geometry is built.
+**One module is built**: [B-spline basis functions and their derivatives](docs/spline-basis.md),
+in batch 1, whose [record](docs/batch1.md) has what was measured. It is with the library's
+first consumer for review. [The batch plan](docs/plan.md) has the order of what follows;
+the next two are to go as far as a contract for that consumer's review before any code.
 
 ## Before a first module
 
-None of this is code.
+All four are done, and none of them was code.
 
 1. ~~**The scope, agreed.**~~ Done 2026-11-22: [the design notes](docs/design.md) record
    what the library is, how data is held, how derivatives and branches are reported, and
    that it may depend on the sister library and does not yet.
-2. **What the design notes still leave open**, where the first module meets it: the
-   layout of a derivative in its array, how near to degenerate counts, and the
-   mathematical conventions, fixed in each contract.
+2. ~~**What the design notes left open**, where the first module met it.~~ Done
+   2026-11-23: the layout of a derivative in its array and the conventions for splines
+   are fixed by [the first contract](docs/spline-basis.md). How near to degenerate counts
+   did not arise, since a basis has no nearly degenerate input that it treats as one.
 3. ~~**The consumer's review**~~ Done 2026-11-22: it accepted [the batch plan](docs/plan.md)
    and [the first module's contract](docs/spline-basis.md), answered the contract's five
    questions, and had one convention tightened.

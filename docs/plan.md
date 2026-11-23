@@ -1,8 +1,14 @@
 # Batch plan
 
-State: reviewed and accepted by the library's first consumer on 2026-11-22. Nothing here
-is built. [The roadmap](../ROADMAP.md) has the consumer's ranking this plan
-follows; [the design notes](design.md) have the decisions every batch rests on.
+State: reviewed and accepted by the library's first consumer on 2026-11-22. **Batch 1 is
+built** ([its record](batch1.md)); nothing else is. [The roadmap](../ROADMAP.md) has the
+consumer's ranking this plan follows; [the design notes](design.md) have the decisions
+every batch rests on.
+
+**Batches 2 and 3 go as far as a contract first.** The consumer asked, on 2026-11-23, for
+each to be sent as a draft contract for its review, with code after it signs: the
+derivatives with respect to control points and the interface of the batched search are
+where its answers shape the design.
 
 A batch is one module, or one coherent addition to one, delivered whole: its contract, its
 source, its tests against an independent reference, its entries in both rosters, its
@@ -13,7 +19,7 @@ need, adjusted so that nothing is built before what it stands on.
 
 | Batch | Module | What it gives | Stands on |
 | --- | --- | --- | --- |
-| 1 | `spline/basis` | B-spline basis functions and their derivatives at a parameter, and for a batch of parameters | nothing |
+| 1, built | `spline/basis` | B-spline basis functions and their derivatives at a parameter, and for a batch of parameters | nothing |
 | 2 | `spline/curve` | A point of a B-spline or rational B-spline curve and its derivatives with respect to the parameter, with the weights needed to differentiate with respect to the control points | 1 |
 | 3 | `spline/nearest` | The parameter of the nearest point of a spline curve to each of a batch of points, with its derivatives and its branch report | 2 |
 | 4 | `conic/ellipse` | For an ellipse: the parameter of a point, nearest and farthest points, radius of curvature, quadrant points, each with derivatives | nothing |
@@ -62,15 +68,15 @@ The same things, so that a reviewer knows where to look.
 
 ## Batch 1 in outline
 
-[Its contract](spline-basis.md) is written and accepted, with an error bound derived
-before the code. In short: a handle made once for a
+[Its contract](spline-basis.md) was written and accepted, with an error bound derived
+before the code, and is built. In short: a handle made once for a
 degree and a highest derivative order owns the scratch; a call takes the knots, a
 parameter or a batch of them, and caller-owned arrays, and writes the span and the values
 of the basis functions that are not zero there, and of their derivatives. A knot vector
 that is not one, a parameter outside the domain, and a derivative asked for where the
 basis does not have it are each refused by name.
 
-## What is needed before batch 1 can be built
+## What was needed before batch 1 could be built
 
 - ~~**A reference text on splines.**~~ In hand since 2026-11-23: H. Prautzsch, W. Boehm
   and M. Paluszny, *Bézier and B-Spline Techniques* (Springer, 2002). Its chapter 5 states
@@ -80,8 +86,8 @@ basis does not have it are each refused by name.
   [The reference texts](references.md) name the edition and the sections batch 1 reads,
   and the three places where the contract departs from the text. The reviewer reads the
   same copy.
-- **The consumer reaching it.** It comes to splines after other work of its own, and
-  there is no hurry.
+- ~~**The consumer reaching it.**~~ On 2026-11-23 it asked for the batch ahead of its own
+  need, so that the module is reviewed and ready when it comes to splines.
 
 Later batches have needs that no text to hand covers; the same page lists them. None
 blocks batch 1.

@@ -81,8 +81,10 @@ A solver differentiates everything it is given.
   cusp, a nearest point at the end of a parameter's range, a rotation's logarithm at a
   half turn, where the axis turns.
 
-**Open**: the layout of a derivative in its array, and whether second derivatives are
-wanted.
+**Decided with the first contract**: derivatives are laid out order by order, all the
+values, then all the first derivatives, then all the second, each row in the order of what
+it is a derivative of; and a call takes the highest order wanted, so second derivatives are
+there for whoever asks.
 
 ## A branch is reported — decided
 
@@ -169,9 +171,10 @@ A consumer may have an implementation of its own that its results must agree wit
   Where both are right and differ, the difference is the consumer's to reconcile on its
   own side.
 
-## Conventions — open
+## Conventions — open, but for splines
 
-To be fixed in each contract and gathered in a glossary with the first module; listed here
+Those for splines are fixed by the first module and are in [the conventions](../CONTEXT.md#splines).
+The rest are to be fixed in each contract as it is written; listed here
 so that none is fixed by accident: radians; right-handed axes; counter-clockwise positive
 in the plane; column vectors; how a rotation is stored and which of a quaternion and its
 negative is returned; how an arc's direction and a curve's parameter range are given.

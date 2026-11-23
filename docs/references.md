@@ -8,8 +8,10 @@ same edition.
 
 Nothing is cited from memory. A text is listed here once it has been opened and the
 sections named below found in it. **How far each was read, as of 2026-11-23**: of the first
-text, sections 5.3, 5.5 to 5.9, 5.11 and 4.8 were read as pages, and what is said of them
-below is what they hold. Every other section on this page is placed by its title, or by a
+text, sections 5.3, 5.5 to 5.9, 5.11, the first four problems of 5.12, and 4.8 were read as
+pages, and what is said of them below is what they hold; of Higham, the pages of the three
+results [the register](provenance.md#the-register) cites. Every other section on this page
+is placed by its title, or by a
 search for its terms, and has not been read; the batch that comes to it reads it then, and
 corrects this page if the section turns out to hold something else.
 
@@ -33,16 +35,17 @@ topology.
 
 Section and page numbers are the printed ones of the editions above.
 
-### Batch 1, `spline/basis`
+### Batch 1, `spline/basis`, built
 
-All in chapter 5 of Prautzsch, Boehm and Paluszny.
+All in chapter 5 of Prautzsch, Boehm and Paluszny. [The register](provenance.md#the-register)
+has what was used.
 
 | What | Where |
 | --- | --- |
 | The recurrence that defines the basis, and the convention that a term whose knots coincide is zero | 5.3, pp. 61 to 62 |
 | The derivative of a spline as a spline one degree lower, equation (1) | 5.6, p. 67 |
 | The properties tested as identities: the sum is one, the support, positivity; and the derivative of one basis function | 5.7, p. 68 |
-| The monomials written in the basis, which the text says generalises Marsden's identity, its Problem 4: the independent exact reference [the contract](spline-basis.md#how-it-will-be-checked) names | 5.8, p. 69, and 5.12 |
+| Marsden's identity, its Problem 4, and the monomials written in the basis, which generalises it: the independent exact reference [the contract](spline-basis.md#how-it-will-be-checked) names | 5.12, p. 75, and 5.8, p. 69 |
 | The basis as a divided difference of a truncated power: a second independent route | 5.11, p. 73 |
 
 Three places where the contract departs from the text. They are the contract's own, and a
