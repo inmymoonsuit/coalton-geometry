@@ -31,6 +31,7 @@
                              (:file "representation")
                              (:ct-file "spline-basis-callers") (:file "spline-basis")
                              (:ct-file "spline-curve-callers") (:file "spline-curve")
+                             (:file "spline-nearest-reference")
                              (:file "aliasing") (:file "scale-sweep")
                              (:file "suite"))))
   :perform (asdf:test-op (operation system)
