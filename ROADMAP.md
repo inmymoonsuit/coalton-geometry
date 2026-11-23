@@ -7,8 +7,8 @@
 [batch 1](docs/batch1.md) and [batch 2](docs/batch2.md) have what was measured. The
 library's first consumer has reviewed batch 1's code with tests of its own and found no
 defect; batch 2's is with it. [The batch plan](docs/plan.md)
-has the order of what follows; the next, the nearest parameter to a point, goes as far as a
-contract for that consumer's review before any code.
+has the order of what follows; the next, [the nearest parameter to a point](docs/spline-nearest.md),
+is a draft contract with that consumer, and no code is written before it signs.
 
 ## Before a first module
 
