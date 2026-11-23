@@ -2,7 +2,8 @@
 
 **State: contract for batch 3. The library's first consumer accepted its shape on
 2026-11-23 and answered its questions; the bounds it asked to have derived before any code
-are derived below. Nothing here is built.** Deriving them changed the wording of two
+are derived below, and it has checked the derivation by hand and had two constants
+corrected. Nothing here is built.** Deriving the bounds changed the wording of two
 promises, which is said where they stand.
 
 Package `coalton-geometry/spline/nearest`. It stands on [the curve module](spline-curve.md)
@@ -40,7 +41,7 @@ allocated, for:
 - a basis made for an order below 2;
 - an interior knot repeated more than `p - 1` times, where the tangent can turn or the
   curve can break;
-- a dimension of zero, or above 4096, the most the bounds below are derived for.
+- a dimension of zero, or above 256, the most the bounds below are derived for.
 
 The control points are not held: they are an argument of every call.
 
@@ -144,9 +145,12 @@ dimension, `u` is `2^-53`, and `γ(k)` is as in [the basis contract](spline-basi
 
 **One device for every comparison.** Each test below is arranged as one computed number
 against a sum of terms that are not negative, and the sum is multiplied by `1 + 2^-40`
-before the comparison. Forming such a sum in floating point from fewer than a thousand
-operations is off by less than `2^-43` of it, so the comparison can only err toward
-keeping an interval, never toward setting one aside.
+before the comparison. A sum of terms that are not negative is off, as computed, by no
+more than its worst term is and a few roundings more; the longest term here is a sum over
+the `D` coordinates, off by at most `γ(D)` of itself. With the dimension at most 256 the
+whole is off by less than `2^-44` of itself, which the margin covers with room. So a
+comparison can only err toward keeping an interval, never toward setting one aside. That
+is where the limit on the dimension comes from.
 
 ### What is known of a whole span
 
@@ -159,8 +163,10 @@ For a span, with `P[j]` its control points:
   derivative, which is zero for a curve of degree 2. Those are differences of differences,
   and a computed difference of computed numbers can lose every digit. So `M3` is taken as
   its computed value plus `2^-40` times the same expression with every difference made a
-  sum of magnitudes, which bounds what the differences lost. `M1` needs nothing of the
-  kind: each of its differences is of two numbers the caller gave.
+  sum of magnitudes, which bounds what the differences lost. `M1` needs no such term: each
+  of its differences is of two numbers the caller gave, so that its rounding, with that of
+  the multiplication, the division and the length, is a few units of roundoff relative to
+  `M1` itself, which the device above absorbs.
 - `W1 = 2p / Δ1` and `W2 = 4p(p - 1) / (Δ1 Δ2)`, with `Δ1` the least `knot[j+p] - knot[j]`
   and `Δ2` the least `knot[j+p-1] - knot[j]` over the span's control points. They bound the
   sums of the basis contract's `S` for the first and the second derivative: each step of
@@ -172,14 +178,23 @@ For a span, with `P[j]` its control points:
 ### The error of what is computed at a parameter
 
 From [the curve contract's bound](spline-curve.md#the-error-bound), in which the weights
-sum to one and `S` sums to at most `W`: writing `τ = (p + 2)² × 2^-1074`, each coordinate
-of the computed point, first and second derivative is within
+sum to one and `S` sums to at most `W`: writing `τ = (p + 1)²(p + 2) × 2^-1074`, each
+coordinate of the computed point, first and second derivative is within
 
     ε0 = (γ(6p + 2) + τ) A  +  τ (A + 1)
     ε1 = (γ(6p + 2) + τ) A W1  +  τ (A (W1 + 1) + 1)
     ε2 = (γ(6p + 2) + τ) A W2  +  τ (A (W1 + 1) + 1)
 
-of its exact value. Write `δ = C(t) - X`. Each computed coordinate of it is within
+of its exact value. The terms in `τ` are that contract's underflow terms. For the point,
+`V` times the `p + 1` magnitudes is at most `(p + 1)²(p + 2) × 2^-1074 A`. For the
+derivatives the sums of the basis contract's `U` are, in units of `2^-1074`, at most
+`W1 p²(p + 1) + p(p + 1)` for the first and `W2 p(p - 1)² + W1 p(p - 1) + p(p + 1)` for the
+second, each step of `U` carrying the sum before it as a step of `S` does and adding one
+unit for each entry it forms. With the products that can underflow, and the factor
+`1 + γ` on all of it, every coefficient is within the `τ` beside it. The first consumer
+found the `τ` of an earlier draft too small from degree 2 and gave this one.
+
+Write `δ = C(t) - X`. Each computed coordinate of it is within
 `E0 = ε0 + 2^-52 (A + B)` of exact. Lengths are computed scaled by their largest
 coordinate, so that no square leaves the range; with `x̂` for a computed `x`:
 
@@ -192,7 +207,8 @@ coordinate, so that no square leaves the range; with `x̂` for a computed `x`:
 | `w = δ · C''` | the sum of products | `e_w = ε2 \|δ̂\|₁ + E0 \|Ĉ''\|₁ + D E0 ε2 + 2^-40 Σ \|δ̂ Ĉ''\|` |
 
 A length is within the error of its vector, and `D` times the largest coordinate error
-bounds that; the `2^-40` terms are the rounding of forming the length or the sum. `e_g` is
+bounds that; the `2^-40` terms are the rounding of forming the length or the sum, which
+the limit on the dimension keeps below them. `e_g` is
 the bound returned among the measures.
 
 ### What follows for a whole interval
